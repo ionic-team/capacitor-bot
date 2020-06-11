@@ -3369,10 +3369,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
 const opened_1 = __importDefault(__webpack_require__(108));
 const run = async () => {
+    const { eventName, payload: { action }, } = github.context;
+    core.info(`Received event: ${eventName}/${action}`);
     try {
-        await opened_1.default();
+        if (eventName === 'issues' && action === 'opened') {
+            await opened_1.default();
+        }
+        else {
+            core.warning(`No handler for ${eventName}`);
+        }
     }
     catch (e) {
         core.error(e);
