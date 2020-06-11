@@ -1,0 +1,29 @@
+{
+  "name": "capacitor-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && ncc build",
+    "watch": "tsc -w"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ionic-team/capacitor-bot.git"
+  },
+  "author": "Ionic <hi@ionicframework.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ionic-team/capacitor-bot/issues"
+  },
+  "homepage": "https://github.com/ionic-team/capacitor-bot#readme",
+  "dependencies": {
+    "@actions/core": "^1.2.4",
+    "@actions/github": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^12.12.47",
+    "@zeit/ncc": "^0.22.3",
+    "typescript": "~3.8.3"
+  }
+}

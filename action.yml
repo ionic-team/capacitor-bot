@@ -1,0 +1,9 @@
+name: Capacitor Bot
+description: The bot for Capacitor repos.
+inputs:
+  repo-token:
+    description: Personal Access Token for GitHub Repository
+    required: true
+runs:
+  using: node12
+  main: dist/index.js
