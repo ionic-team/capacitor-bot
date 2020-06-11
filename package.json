@@ -5,7 +5,14 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc && ncc build",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "prettier": "prettier 'src/**/*.ts'",
+    "fmt": "npm run prettier -- --write"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run prettier -- --check"
+    }
   },
   "repository": {
     "type": "git",
@@ -24,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^12.12.47",
     "@zeit/ncc": "^0.22.3",
+    "prettier": "^2.0.5",
     "typescript": "~3.8.3"
   }
 }
