@@ -8,11 +8,13 @@ const run = async (): Promise<void> => {
     payload: { action },
   } = github.context;
 
+  const repoToken = core.getInput('repo-token', { required: true });
+
   core.info(`Received event: ${eventName}/${action}`);
 
   try {
     if (eventName === 'issues' && action === 'opened') {
-      await processIssueOpened();
+      await processIssueOpened(repoToken);
     } else {
       core.warning(`No handler for ${eventName}`);
     }

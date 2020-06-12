@@ -4,6 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
+    "test": "jest",
     "build": "tsc && ncc build",
     "watch": "tsc -w",
     "prettier": "prettier 'src/**/*.ts'",
@@ -26,12 +27,18 @@
   "homepage": "https://github.com/ionic-team/capacitor-bot#readme",
   "dependencies": {
     "@actions/core": "^1.2.4",
-    "@actions/github": "^3.0.0"
+    "@actions/github": "^3.0.0",
+    "lodash": "^4.17.15",
+    "remark": "^12.0.0"
   },
   "devDependencies": {
+    "@types/jest": "^26.0.0",
+    "@types/lodash": "^4.14.155",
     "@types/node": "^12.12.47",
     "@zeit/ncc": "^0.22.3",
+    "jest": "^26.0.1",
     "prettier": "^2.0.5",
+    "ts-jest": "^26.1.0",
     "typescript": "~3.8.3"
   }
 }
