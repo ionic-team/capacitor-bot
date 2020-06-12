@@ -16490,13 +16490,18 @@ const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const run = async (repoToken) => {
     const client = github.getOctokit(repoToken);
-    await client.issues.removeLabel({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        issue_number: github.context.issue.number,
-        name: 'needs-reply',
-    });
-    core.info(`removed needs-reply label from issue #${github.context.issue.number}`);
+    try {
+        await client.issues.removeLabel({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            issue_number: github.context.issue.number,
+            name: 'needs-reply',
+        });
+        core.info(`removed needs-reply label from issue #${github.context.issue.number}`);
+    }
+    catch (e) {
+        core.warning(e.message);
+    }
 };
 exports.default = run;
 
