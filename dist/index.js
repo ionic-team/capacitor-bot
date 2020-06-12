@@ -2823,6 +2823,7 @@ const run = async (repoToken) => {
         issue_number: github.context.issue.number,
         labels: platforms,
     });
+    core.info(`added ${platforms.join(', ')} labels to issue #${github.context.issue.number}`);
 };
 exports.default = run;
 
