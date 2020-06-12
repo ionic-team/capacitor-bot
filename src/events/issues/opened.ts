@@ -1,11 +1,11 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 
+import { getPlatforms } from '../../utils/issues';
 import {
+  parseMarkdownIntoSections,
   findSectionByLooseTitle,
-  getPlatforms,
-  parseIssue,
-} from '../../utils/issues';
+} from '../../utils/markdown';
 
 const run = async (repoToken: string) => {
   const client = github.getOctokit(repoToken);
@@ -16,7 +16,7 @@ const run = async (repoToken: string) => {
     return;
   }
 
-  const { sections } = parseIssue(issue.body);
+  const { sections } = parseMarkdownIntoSections(issue.body);
   const section = findSectionByLooseTitle(sections, 'platform');
 
   if (!section) {

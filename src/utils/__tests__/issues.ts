@@ -1,4 +1,8 @@
-import { findSectionByLooseTitle, getPlatforms, parseIssue } from '../issues';
+import { getPlatforms } from '../issues';
+import {
+  findSectionByLooseTitle,
+  parseMarkdownIntoSections,
+} from '../markdown';
 
 describe('utils/issues', () => {
   describe('getPlatforms', () => {
@@ -18,9 +22,9 @@ Describe how the bug manifests. Be specific.
 -->
 `;
 
-      const issue = parseIssue(body);
+      const { sections } = parseMarkdownIntoSections(body);
       const expected = ['android', 'ios'];
-      const section = findSectionByLooseTitle(issue.sections, 'platform')!;
+      const section = findSectionByLooseTitle(sections, 'platform')!;
       const result = getPlatforms(section.nodes);
 
       expect(result).toEqual(expected);
@@ -43,9 +47,9 @@ Describe how the bug manifests. Be specific.
 -->
 `;
 
-      const issue = parseIssue(body);
+      const { sections } = parseMarkdownIntoSections(body);
       const expected = ['android', 'ios'];
-      const section = findSectionByLooseTitle(issue.sections, 'platform')!;
+      const section = findSectionByLooseTitle(sections, 'platform')!;
       const result = getPlatforms(section.nodes);
 
       expect(result).toEqual(expected);
@@ -68,9 +72,9 @@ Describe how the bug manifests. Be specific.
 -->
 `;
 
-      const issue = parseIssue(body);
+      const { sections } = parseMarkdownIntoSections(body);
       const expected = ['android', 'ios'];
-      const section = findSectionByLooseTitle(issue.sections, 'platform')!;
+      const section = findSectionByLooseTitle(sections, 'platform')!;
       const result = getPlatforms(section.nodes);
 
       expect(result).toEqual(expected);

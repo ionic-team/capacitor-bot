@@ -72,7 +72,302 @@ module.exports = cloneDataView;
 
 
 /***/ }),
-/* 1 */,
+/* 1 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const childProcess = __webpack_require__(129);
+const path = __webpack_require__(622);
+const util_1 = __webpack_require__(669);
+const ioUtil = __webpack_require__(672);
+const exec = util_1.promisify(childProcess.exec);
+/**
+ * Copies a file or folder.
+ * Based off of shelljs - https://github.com/shelljs/shelljs/blob/9237f66c52e5daa40458f94f9565e18e8132f5a6/src/cp.js
+ *
+ * @param     source    source path
+ * @param     dest      destination path
+ * @param     options   optional. See CopyOptions.
+ */
+function cp(source, dest, options = {}) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { force, recursive } = readCopyOptions(options);
+        const destStat = (yield ioUtil.exists(dest)) ? yield ioUtil.stat(dest) : null;
+        // Dest is an existing file, but not forcing
+        if (destStat && destStat.isFile() && !force) {
+            return;
+        }
+        // If dest is an existing directory, should copy inside.
+        const newDest = destStat && destStat.isDirectory()
+            ? path.join(dest, path.basename(source))
+            : dest;
+        if (!(yield ioUtil.exists(source))) {
+            throw new Error(`no such file or directory: ${source}`);
+        }
+        const sourceStat = yield ioUtil.stat(source);
+        if (sourceStat.isDirectory()) {
+            if (!recursive) {
+                throw new Error(`Failed to copy. ${source} is a directory, but tried to copy without recursive flag.`);
+            }
+            else {
+                yield cpDirRecursive(source, newDest, 0, force);
+            }
+        }
+        else {
+            if (path.relative(source, newDest) === '') {
+                // a file cannot be copied to itself
+                throw new Error(`'${newDest}' and '${source}' are the same file`);
+            }
+            yield copyFile(source, newDest, force);
+        }
+    });
+}
+exports.cp = cp;
+/**
+ * Moves a path.
+ *
+ * @param     source    source path
+ * @param     dest      destination path
+ * @param     options   optional. See MoveOptions.
+ */
+function mv(source, dest, options = {}) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (yield ioUtil.exists(dest)) {
+            let destExists = true;
+            if (yield ioUtil.isDirectory(dest)) {
+                // If dest is directory copy src into dest
+                dest = path.join(dest, path.basename(source));
+                destExists = yield ioUtil.exists(dest);
+            }
+            if (destExists) {
+                if (options.force == null || options.force) {
+                    yield rmRF(dest);
+                }
+                else {
+                    throw new Error('Destination already exists');
+                }
+            }
+        }
+        yield mkdirP(path.dirname(dest));
+        yield ioUtil.rename(source, dest);
+    });
+}
+exports.mv = mv;
+/**
+ * Remove a path recursively with force
+ *
+ * @param inputPath path to remove
+ */
+function rmRF(inputPath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (ioUtil.IS_WINDOWS) {
+            // Node doesn't provide a delete operation, only an unlink function. This means that if the file is being used by another
+            // program (e.g. antivirus), it won't be deleted. To address this, we shell out the work to rd/del.
+            try {
+                if (yield ioUtil.isDirectory(inputPath, true)) {
+                    yield exec(`rd /s /q "${inputPath}"`);
+                }
+                else {
+                    yield exec(`del /f /a "${inputPath}"`);
+                }
+            }
+            catch (err) {
+                // if you try to delete a file that doesn't exist, desired result is achieved
+                // other errors are valid
+                if (err.code !== 'ENOENT')
+                    throw err;
+            }
+            // Shelling out fails to remove a symlink folder with missing source, this unlink catches that
+            try {
+                yield ioUtil.unlink(inputPath);
+            }
+            catch (err) {
+                // if you try to delete a file that doesn't exist, desired result is achieved
+                // other errors are valid
+                if (err.code !== 'ENOENT')
+                    throw err;
+            }
+        }
+        else {
+            let isDir = false;
+            try {
+                isDir = yield ioUtil.isDirectory(inputPath);
+            }
+            catch (err) {
+                // if you try to delete a file that doesn't exist, desired result is achieved
+                // other errors are valid
+                if (err.code !== 'ENOENT')
+                    throw err;
+                return;
+            }
+            if (isDir) {
+                yield exec(`rm -rf "${inputPath}"`);
+            }
+            else {
+                yield ioUtil.unlink(inputPath);
+            }
+        }
+    });
+}
+exports.rmRF = rmRF;
+/**
+ * Make a directory.  Creates the full path with folders in between
+ * Will throw if it fails
+ *
+ * @param   fsPath        path to create
+ * @returns Promise<void>
+ */
+function mkdirP(fsPath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield ioUtil.mkdirP(fsPath);
+    });
+}
+exports.mkdirP = mkdirP;
+/**
+ * Returns path of a tool had the tool actually been invoked.  Resolves via paths.
+ * If you check and the tool does not exist, it will throw.
+ *
+ * @param     tool              name of the tool
+ * @param     check             whether to check if tool exists
+ * @returns   Promise<string>   path to tool
+ */
+function which(tool, check) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!tool) {
+            throw new Error("parameter 'tool' is required");
+        }
+        // recursive when check=true
+        if (check) {
+            const result = yield which(tool, false);
+            if (!result) {
+                if (ioUtil.IS_WINDOWS) {
+                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also verify the file has a valid extension for an executable file.`);
+                }
+                else {
+                    throw new Error(`Unable to locate executable file: ${tool}. Please verify either the file path exists or the file can be found within a directory specified by the PATH environment variable. Also check the file mode to verify the file is executable.`);
+                }
+            }
+        }
+        try {
+            // build the list of extensions to try
+            const extensions = [];
+            if (ioUtil.IS_WINDOWS && process.env.PATHEXT) {
+                for (const extension of process.env.PATHEXT.split(path.delimiter)) {
+                    if (extension) {
+                        extensions.push(extension);
+                    }
+                }
+            }
+            // if it's rooted, return it if exists. otherwise return empty.
+            if (ioUtil.isRooted(tool)) {
+                const filePath = yield ioUtil.tryGetExecutablePath(tool, extensions);
+                if (filePath) {
+                    return filePath;
+                }
+                return '';
+            }
+            // if any path separators, return empty
+            if (tool.includes('/') || (ioUtil.IS_WINDOWS && tool.includes('\\'))) {
+                return '';
+            }
+            // build the list of directories
+            //
+            // Note, technically "where" checks the current directory on Windows. From a toolkit perspective,
+            // it feels like we should not do this. Checking the current directory seems like more of a use
+            // case of a shell, and the which() function exposed by the toolkit should strive for consistency
+            // across platforms.
+            const directories = [];
+            if (process.env.PATH) {
+                for (const p of process.env.PATH.split(path.delimiter)) {
+                    if (p) {
+                        directories.push(p);
+                    }
+                }
+            }
+            // return the first match
+            for (const directory of directories) {
+                const filePath = yield ioUtil.tryGetExecutablePath(directory + path.sep + tool, extensions);
+                if (filePath) {
+                    return filePath;
+                }
+            }
+            return '';
+        }
+        catch (err) {
+            throw new Error(`which failed with message ${err.message}`);
+        }
+    });
+}
+exports.which = which;
+function readCopyOptions(options) {
+    const force = options.force == null ? true : options.force;
+    const recursive = Boolean(options.recursive);
+    return { force, recursive };
+}
+function cpDirRecursive(sourceDir, destDir, currentDepth, force) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Ensure there is not a run away recursive copy
+        if (currentDepth >= 255)
+            return;
+        currentDepth++;
+        yield mkdirP(destDir);
+        const files = yield ioUtil.readdir(sourceDir);
+        for (const fileName of files) {
+            const srcFile = `${sourceDir}/${fileName}`;
+            const destFile = `${destDir}/${fileName}`;
+            const srcFileStat = yield ioUtil.lstat(srcFile);
+            if (srcFileStat.isDirectory()) {
+                // Recurse
+                yield cpDirRecursive(srcFile, destFile, currentDepth, force);
+            }
+            else {
+                yield copyFile(srcFile, destFile, force);
+            }
+        }
+        // Change the mode for the newly created directory
+        yield ioUtil.chmod(destDir, (yield ioUtil.stat(sourceDir)).mode);
+    });
+}
+// Buffered file copy
+function copyFile(srcFile, destFile, force) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if ((yield ioUtil.lstat(srcFile)).isSymbolicLink()) {
+            // unlink/re-link it
+            try {
+                yield ioUtil.lstat(destFile);
+                yield ioUtil.unlink(destFile);
+            }
+            catch (e) {
+                // Try to override file permission
+                if (e.code === 'EPERM') {
+                    yield ioUtil.chmod(destFile, '0666');
+                    yield ioUtil.unlink(destFile);
+                }
+                // other errors = it doesn't exist, no work to do
+            }
+            // Copy over symlink
+            const symlinkFull = yield ioUtil.readlink(srcFile);
+            yield ioUtil.symlink(symlinkFull, destFile, ioUtil.IS_WINDOWS ? 'junction' : null);
+        }
+        else if (!(yield ioUtil.exists(destFile)) || force) {
+            yield ioUtil.copyFile(srcFile, destFile);
+        }
+    });
+}
+//# sourceMappingURL=io.js.map
+
+/***/ }),
 /* 2 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -158,7 +453,59 @@ function factory(key, state, ctx) {
 
 /***/ }),
 /* 5 */,
-/* 6 */,
+/* 6 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const fn_1 = __webpack_require__(67);
+exports.parseContributors = (html) => {
+    const str = html.trim();
+    const m = /\s*<p.*?>\n[\s\S]*?<\/p>/g.exec(str);
+    if (!m) {
+        core.warning('contributors html does not match expected pattern!');
+        return [];
+    }
+    const lines = str.split('\n');
+    const contributors = lines
+        .slice(1, lines.length - 1)
+        .map(parseContributor)
+        .filter(fn_1.isNonNull);
+    return contributors;
+};
+const parseContributor = (line) => {
+    var _a;
+    const m = /^\s*<a href="https:\/\/github.com\/(?<contributor>[^"]+)"><img.*?\/><\/a>$/g.exec(line);
+    if (!m) {
+        core.warning('line did not match expected pattern!');
+        return;
+    }
+    const contributor = (_a = m.groups) === null || _a === void 0 ? void 0 : _a.contributor;
+    if (!contributor) {
+        core.warning('could not parse contributor from line!');
+        return;
+    }
+    return contributor;
+};
+exports.generateContributors = (contributors) => {
+    const html = contributors.map(generateContributorLine).join('\n');
+    return `<p align="center">\n${html}\n</p>`;
+};
+const generateContributorLine = (contributor) => {
+    return `  <a href="https://github.com/${contributor}"><img src="https://github.com/${contributor}.png?size=100" width="50" height="50" /></a>`;
+};
+
+
+/***/ }),
 /* 7 */,
 /* 8 */
 /***/ (function(module) {
@@ -680,7 +1027,18 @@ module.exports = opts => {
 /* 40 */,
 /* 41 */,
 /* 42 */,
-/* 43 */,
+/* 43 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = {
+  copySync: __webpack_require__(110)
+}
+
+
+/***/ }),
 /* 44 */,
 /* 45 */,
 /* 46 */,
@@ -751,7 +1109,7 @@ module.exports = windowsRelease;
 
 var Symbol = __webpack_require__(498),
     getRawTag = __webpack_require__(985),
-    objectToString = __webpack_require__(678);
+    objectToString = __webpack_require__(602);
 
 /** `Object#toString` result references. */
 var nullTag = '[object Null]',
@@ -786,63 +1144,229 @@ module.exports = baseGetTag;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
+// Adapted from https://github.com/sindresorhus/make-dir
+// Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+const fs = __webpack_require__(869)
+const path = __webpack_require__(622)
+const atLeastNode = __webpack_require__(159)
 
-var compact = __webpack_require__(218)
+const useNativeRecursiveOption = atLeastNode('10.12.0')
 
-module.exports = compile
+// https://github.com/nodejs/node/issues/8987
+// https://github.com/libuv/libuv/pull/1088
+const checkPath = pth => {
+  if (process.platform === 'win32') {
+    const pathHasInvalidWinCharacters = /[<>:"|?*]/.test(pth.replace(path.parse(pth).root, ''))
 
-// Stringify the given tree.
-function compile() {
-  return this.visit(compact(this.tree, this.options.commonmark))
+    if (pathHasInvalidWinCharacters) {
+      const error = new Error(`Path contains invalid characters: ${pth}`)
+      error.code = 'EINVAL'
+      throw error
+    }
+  }
+}
+
+const processOptions = options => {
+  const defaults = { mode: 0o777 }
+  if (typeof options === 'number') options = { mode: options }
+  return { ...defaults, ...options }
+}
+
+const permissionError = pth => {
+  // This replicates the exception of `fs.mkdir` with native the
+  // `recusive` option when run on an invalid drive under Windows.
+  const error = new Error(`operation not permitted, mkdir '${pth}'`)
+  error.code = 'EPERM'
+  error.errno = -4048
+  error.path = pth
+  error.syscall = 'mkdir'
+  return error
+}
+
+module.exports.makeDir = async (input, options) => {
+  checkPath(input)
+  options = processOptions(options)
+
+  if (useNativeRecursiveOption) {
+    const pth = path.resolve(input)
+
+    return fs.mkdir(pth, {
+      mode: options.mode,
+      recursive: true
+    })
+  }
+
+  const make = async pth => {
+    try {
+      await fs.mkdir(pth, options.mode)
+    } catch (error) {
+      if (error.code === 'EPERM') {
+        throw error
+      }
+
+      if (error.code === 'ENOENT') {
+        if (path.dirname(pth) === pth) {
+          throw permissionError(pth)
+        }
+
+        if (error.message.includes('null bytes')) {
+          throw error
+        }
+
+        await make(path.dirname(pth))
+        return make(pth)
+      }
+
+      try {
+        const stats = await fs.stat(pth)
+        if (!stats.isDirectory()) {
+          // This error is never exposed to the user
+          // it is caught below, and the original error is thrown
+          throw new Error('The path is not a directory')
+        }
+      } catch {
+        throw error
+      }
+    }
+  }
+
+  return make(path.resolve(input))
+}
+
+module.exports.makeDirSync = (input, options) => {
+  checkPath(input)
+  options = processOptions(options)
+
+  if (useNativeRecursiveOption) {
+    const pth = path.resolve(input)
+
+    return fs.mkdirSync(pth, {
+      mode: options.mode,
+      recursive: true
+    })
+  }
+
+  const make = pth => {
+    try {
+      fs.mkdirSync(pth, options.mode)
+    } catch (error) {
+      if (error.code === 'EPERM') {
+        throw error
+      }
+
+      if (error.code === 'ENOENT') {
+        if (path.dirname(pth) === pth) {
+          throw permissionError(pth)
+        }
+
+        if (error.message.includes('null bytes')) {
+          throw error
+        }
+
+        make(path.dirname(pth))
+        return make(pth)
+      }
+
+      try {
+        if (!fs.statSync(pth).isDirectory()) {
+          // This error is never exposed to the user
+          // it is caught below, and the original error is thrown
+          throw new Error('The path is not a directory')
+        }
+      } catch {
+        throw error
+      }
+    }
+  }
+
+  return make(path.resolve(input))
 }
 
 
 /***/ }),
-/* 55 */,
-/* 56 */
-/***/ (function(module) {
+/* 55 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/** Used as references for various `Number` constants. */
-var MAX_SAFE_INTEGER = 9007199254740991;
+var apply = __webpack_require__(512),
+    createCtor = __webpack_require__(546),
+    root = __webpack_require__(824);
+
+/** Used to compose bitmasks for function metadata. */
+var WRAP_BIND_FLAG = 1;
 
 /**
- * Checks if `value` is a valid array-like length.
+ * Creates a function that wraps `func` to invoke it with the `this` binding
+ * of `thisArg` and `partials` prepended to the arguments it receives.
  *
- * **Note:** This method is loosely based on
- * [`ToLength`](http://ecma-international.org/ecma-262/7.0/#sec-tolength).
- *
- * @static
- * @memberOf _
- * @since 4.0.0
- * @category Lang
- * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if `value` is a valid length, else `false`.
- * @example
- *
- * _.isLength(3);
- * // => true
- *
- * _.isLength(Number.MIN_VALUE);
- * // => false
- *
- * _.isLength(Infinity);
- * // => false
- *
- * _.isLength('3');
- * // => false
+ * @private
+ * @param {Function} func The function to wrap.
+ * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
+ * @param {*} thisArg The `this` binding of `func`.
+ * @param {Array} partials The arguments to prepend to those provided to
+ *  the new function.
+ * @returns {Function} Returns the new wrapped function.
  */
-function isLength(value) {
-  return typeof value == 'number' &&
-    value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
+function createPartial(func, bitmask, thisArg, partials) {
+  var isBind = bitmask & WRAP_BIND_FLAG,
+      Ctor = createCtor(func);
+
+  function wrapper() {
+    var argsIndex = -1,
+        argsLength = arguments.length,
+        leftIndex = -1,
+        leftLength = partials.length,
+        args = Array(leftLength + argsLength),
+        fn = (this && this !== root && this instanceof wrapper) ? Ctor : func;
+
+    while (++leftIndex < leftLength) {
+      args[leftIndex] = partials[leftIndex];
+    }
+    while (argsLength--) {
+      args[leftIndex++] = arguments[++argsIndex];
+    }
+    return apply(fn, isBind ? thisArg : this, args);
+  }
+  return wrapper;
 }
 
-module.exports = isLength;
+module.exports = createPartial;
 
 
 /***/ }),
+/* 56 */,
 /* 57 */,
-/* 58 */,
+/* 58 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseCreate = __webpack_require__(782),
+    baseLodash = __webpack_require__(681);
+
+/**
+ * The base constructor for creating `lodash` wrapper objects.
+ *
+ * @private
+ * @param {*} value The value to wrap.
+ * @param {boolean} [chainAll] Enable explicit method chain sequences.
+ */
+function LodashWrapper(value, chainAll) {
+  this.__wrapped__ = value;
+  this.__actions__ = [];
+  this.__chain__ = !!chainAll;
+  this.__index__ = 0;
+  this.__values__ = undefined;
+}
+
+LodashWrapper.prototype = baseCreate(baseLodash.prototype);
+LodashWrapper.prototype.constructor = LodashWrapper;
+
+module.exports = LodashWrapper;
+
+
+/***/ }),
 /* 59 */,
 /* 60 */,
 /* 61 */,
@@ -979,12 +1503,21 @@ module.exports = initCloneObject;
 
 
 /***/ }),
-/* 67 */,
+/* 67 */
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.isNonNull = (t) => t !== null && t !== undefined;
+
+
+/***/ }),
 /* 68 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var Symbol = __webpack_require__(498),
-    arrayMap = __webpack_require__(727),
+    arrayMap = __webpack_require__(766),
     isArray = __webpack_require__(143),
     isSymbol = __webpack_require__(186);
 
@@ -1028,7 +1561,7 @@ module.exports = baseToString;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var baseSetToString = __webpack_require__(292),
-    shortOut = __webpack_require__(906);
+    shortOut = __webpack_require__(304);
 
 /**
  * Sets the `toString` method of `func` to return `string`.
@@ -1048,7 +1581,7 @@ module.exports = setToString;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var mapping = __webpack_require__(524),
-    fallbackHolder = __webpack_require__(602);
+    fallbackHolder = __webpack_require__(801);
 
 /** Built-in value reference. */
 var push = Array.prototype.push;
@@ -1767,236 +2300,30 @@ module.exports = equalByTag;
 
 /***/ }),
 /* 75 */,
-/* 76 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-var whitespace = __webpack_require__(578)
-var decode = __webpack_require__(277)
-var locate = __webpack_require__(725)
-
-module.exports = autoLink
-autoLink.locator = locate
-autoLink.notInLink = true
-
-var lessThan = '<'
-var greaterThan = '>'
-var atSign = '@'
-var slash = '/'
-var mailto = 'mailto:'
-var mailtoLength = mailto.length
-
-function autoLink(eat, value, silent) {
-  var self = this
-  var subvalue = ''
-  var length = value.length
-  var index = 0
-  var queue = ''
-  var hasAtCharacter = false
-  var link = ''
-  var character
-  var now
-  var content
-  var tokenizers
-  var exit
-
-  if (value.charAt(0) !== lessThan) {
-    return
-  }
-
-  index++
-  subvalue = lessThan
-
-  while (index < length) {
-    character = value.charAt(index)
-
-    if (
-      whitespace(character) ||
-      character === greaterThan ||
-      character === atSign ||
-      (character === ':' && value.charAt(index + 1) === slash)
-    ) {
-      break
-    }
-
-    queue += character
-    index++
-  }
-
-  if (!queue) {
-    return
-  }
-
-  link += queue
-  queue = ''
-
-  character = value.charAt(index)
-  link += character
-  index++
-
-  if (character === atSign) {
-    hasAtCharacter = true
-  } else {
-    if (character !== ':' || value.charAt(index + 1) !== slash) {
-      return
-    }
-
-    link += slash
-    index++
-  }
-
-  while (index < length) {
-    character = value.charAt(index)
-
-    if (whitespace(character) || character === greaterThan) {
-      break
-    }
-
-    queue += character
-    index++
-  }
-
-  character = value.charAt(index)
-
-  if (!queue || character !== greaterThan) {
-    return
-  }
-
-  /* istanbul ignore if - never used (yet) */
-  if (silent) {
-    return true
-  }
-
-  link += queue
-  content = link
-  subvalue += link + character
-  now = eat.now()
-  now.column++
-  now.offset++
-
-  if (hasAtCharacter) {
-    if (link.slice(0, mailtoLength).toLowerCase() === mailto) {
-      content = content.slice(mailtoLength)
-      now.column += mailtoLength
-      now.offset += mailtoLength
-    } else {
-      link = mailto + link
-    }
-  }
-
-  // Temporarily remove all tokenizers except text in autolinks.
-  tokenizers = self.inlineTokenizers
-  self.inlineTokenizers = {text: tokenizers.text}
-
-  exit = self.enterLink()
-
-  content = self.tokenizeInline(content, now)
-
-  self.inlineTokenizers = tokenizers
-  exit()
-
-  return eat(subvalue)({
-    type: 'link',
-    title: null,
-    url: decode(link, {nonTerminated: false}),
-    children: content
-  })
-}
-
-
-/***/ }),
+/* 76 */,
 /* 77 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
+var coreJsData = __webpack_require__(396);
 
+/** Used to detect methods masquerading as native. */
+var maskSrcKey = (function() {
+  var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || '');
+  return uid ? ('Symbol(src)_1.' + uid) : '';
+}());
 
-var trim = __webpack_require__(860)
-var word = __webpack_require__(122)
-var whitespace = __webpack_require__(578)
-var locate = __webpack_require__(99)
-
-module.exports = emphasis
-emphasis.locator = locate
-
-var asterisk = '*'
-var underscore = '_'
-var backslash = '\\'
-
-function emphasis(eat, value, silent) {
-  var self = this
-  var index = 0
-  var character = value.charAt(index)
-  var now
-  var pedantic
-  var marker
-  var queue
-  var subvalue
-  var length
-  var previous
-
-  if (character !== asterisk && character !== underscore) {
-    return
-  }
-
-  pedantic = self.options.pedantic
-  subvalue = character
-  marker = character
-  length = value.length
-  index++
-  queue = ''
-  character = ''
-
-  if (pedantic && whitespace(value.charAt(index))) {
-    return
-  }
-
-  while (index < length) {
-    previous = character
-    character = value.charAt(index)
-
-    if (character === marker && (!pedantic || !whitespace(previous))) {
-      character = value.charAt(++index)
-
-      if (character !== marker) {
-        if (!trim(queue) || previous === marker) {
-          return
-        }
-
-        if (!pedantic && marker === underscore && word(character)) {
-          queue += marker
-          continue
-        }
-
-        /* istanbul ignore if - never used (yet) */
-        if (silent) {
-          return true
-        }
-
-        now = eat.now()
-        now.column++
-        now.offset++
-
-        return eat(subvalue + queue + marker)({
-          type: 'emphasis',
-          children: self.tokenizeInline(queue, now)
-        })
-      }
-
-      queue += marker
-    }
-
-    if (!pedantic && character === backslash) {
-      queue += character
-      character = value.charAt(++index)
-    }
-
-    queue += character
-    index++
-  }
+/**
+ * Checks if `func` has its source masked.
+ *
+ * @private
+ * @param {Function} func The function to check.
+ * @returns {boolean} Returns `true` if `func` is masked, else `false`.
+ */
+function isMasked(func) {
+  return !!maskSrcKey && (maskSrcKey in func);
 }
+
+module.exports = isMasked;
 
 
 /***/ }),
@@ -2401,36 +2728,25 @@ function link(eat, value, silent) {
 /* 80 */,
 /* 81 */,
 /* 82 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
+var identity = __webpack_require__(83),
+    metaMap = __webpack_require__(156);
 
+/**
+ * The base implementation of `setData` without support for hot loop shorting.
+ *
+ * @private
+ * @param {Function} func The function to associate metadata with.
+ * @param {*} data The metadata.
+ * @returns {Function} Returns `func`.
+ */
+var baseSetData = !metaMap ? identity : function(func, data) {
+  metaMap.set(func, data);
+  return func;
+};
 
-module.exports = label
-
-var leftSquareBracket = '['
-var rightSquareBracket = ']'
-
-var shortcut = 'shortcut'
-var collapsed = 'collapsed'
-
-// Stringify a reference label.
-// Because link references are easily, mistakingly, created (for example,
-// `[foo]`), reference nodes have an extra property depicting how it looked in
-// the original document, so stringification can cause minimal changes.
-function label(node) {
-  var type = node.referenceType
-
-  if (type === shortcut) {
-    return ''
-  }
-
-  return (
-    leftSquareBracket +
-    (type === collapsed ? '' : node.label || node.identifier) +
-    rightSquareBracket
-  )
-}
+module.exports = baseSetData;
 
 
 /***/ }),
@@ -2587,7 +2903,130 @@ module.exports = equalArrays;
 /***/ }),
 /* 91 */,
 /* 92 */,
-/* 93 */,
+/* 93 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var Stream = __webpack_require__(794).Stream
+
+module.exports = legacy
+
+function legacy (fs) {
+  return {
+    ReadStream: ReadStream,
+    WriteStream: WriteStream
+  }
+
+  function ReadStream (path, options) {
+    if (!(this instanceof ReadStream)) return new ReadStream(path, options);
+
+    Stream.call(this);
+
+    var self = this;
+
+    this.path = path;
+    this.fd = null;
+    this.readable = true;
+    this.paused = false;
+
+    this.flags = 'r';
+    this.mode = 438; /*=0666*/
+    this.bufferSize = 64 * 1024;
+
+    options = options || {};
+
+    // Mixin options into this
+    var keys = Object.keys(options);
+    for (var index = 0, length = keys.length; index < length; index++) {
+      var key = keys[index];
+      this[key] = options[key];
+    }
+
+    if (this.encoding) this.setEncoding(this.encoding);
+
+    if (this.start !== undefined) {
+      if ('number' !== typeof this.start) {
+        throw TypeError('start must be a Number');
+      }
+      if (this.end === undefined) {
+        this.end = Infinity;
+      } else if ('number' !== typeof this.end) {
+        throw TypeError('end must be a Number');
+      }
+
+      if (this.start > this.end) {
+        throw new Error('start must be <= end');
+      }
+
+      this.pos = this.start;
+    }
+
+    if (this.fd !== null) {
+      process.nextTick(function() {
+        self._read();
+      });
+      return;
+    }
+
+    fs.open(this.path, this.flags, this.mode, function (err, fd) {
+      if (err) {
+        self.emit('error', err);
+        self.readable = false;
+        return;
+      }
+
+      self.fd = fd;
+      self.emit('open', fd);
+      self._read();
+    })
+  }
+
+  function WriteStream (path, options) {
+    if (!(this instanceof WriteStream)) return new WriteStream(path, options);
+
+    Stream.call(this);
+
+    this.path = path;
+    this.fd = null;
+    this.writable = true;
+
+    this.flags = 'w';
+    this.encoding = 'binary';
+    this.mode = 438; /*=0666*/
+    this.bytesWritten = 0;
+
+    options = options || {};
+
+    // Mixin options into this
+    var keys = Object.keys(options);
+    for (var index = 0, length = keys.length; index < length; index++) {
+      var key = keys[index];
+      this[key] = options[key];
+    }
+
+    if (this.start !== undefined) {
+      if ('number' !== typeof this.start) {
+        throw TypeError('start must be a Number');
+      }
+      if (this.start < 0) {
+        throw new Error('start must be >= zero');
+      }
+
+      this.pos = this.start;
+    }
+
+    this.busy = false;
+    this._queue = [];
+
+    if (this.fd === null) {
+      this._open = fs.open;
+      this._queue.push([this._open, this.path, this.flags, this.mode, undefined]);
+      this.flush();
+    }
+  }
+}
+
+
+/***/ }),
 /* 94 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -2641,7 +3080,60 @@ function setOptions(options) {
 
 
 /***/ }),
-/* 95 */,
+/* 95 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const fs = __webpack_require__(598)
+const path = __webpack_require__(622)
+const copySync = __webpack_require__(43).copySync
+const removeSync = __webpack_require__(723).removeSync
+const mkdirpSync = __webpack_require__(727).mkdirpSync
+const stat = __webpack_require__(425)
+
+function moveSync (src, dest, opts) {
+  opts = opts || {}
+  const overwrite = opts.overwrite || opts.clobber || false
+
+  const { srcStat } = stat.checkPathsSync(src, dest, 'move')
+  stat.checkParentPathsSync(src, srcStat, dest, 'move')
+  mkdirpSync(path.dirname(dest))
+  return doRename(src, dest, overwrite)
+}
+
+function doRename (src, dest, overwrite) {
+  if (overwrite) {
+    removeSync(dest)
+    return rename(src, dest, overwrite)
+  }
+  if (fs.existsSync(dest)) throw new Error('dest already exists.')
+  return rename(src, dest, overwrite)
+}
+
+function rename (src, dest, overwrite) {
+  try {
+    fs.renameSync(src, dest)
+  } catch (err) {
+    if (err.code !== 'EXDEV') throw err
+    return moveAcrossDevice(src, dest, overwrite)
+  }
+}
+
+function moveAcrossDevice (src, dest, overwrite) {
+  const opts = {
+    overwrite,
+    errorOnExist: true
+  }
+  copySync(src, dest, opts)
+  return removeSync(src)
+}
+
+module.exports = moveSync
+
+
+/***/ }),
 /* 96 */
 /***/ (function(module) {
 
@@ -2666,7 +3158,38 @@ function enclose(title) {
 
 
 /***/ }),
-/* 97 */,
+/* 97 */
+/***/ (function(module) {
+
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Initializes an array clone.
+ *
+ * @private
+ * @param {Array} array The array to clone.
+ * @returns {Array} Returns the initialized clone.
+ */
+function initCloneArray(array) {
+  var length = array.length,
+      result = new array.constructor(length);
+
+  // Add properties assigned by `RegExp#exec`.
+  if (length && typeof array[0] == 'string' && hasOwnProperty.call(array, 'index')) {
+    result.index = array.index;
+    result.input = array.input;
+  }
+  return result;
+}
+
+module.exports = initCloneArray;
+
+
+/***/ }),
 /* 98 */,
 /* 99 */
 /***/ (function(module) {
@@ -2750,39 +3273,93 @@ module.exports = value => {
 /* 106 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var arrayMap = __webpack_require__(727),
-    copyArray = __webpack_require__(239),
-    isArray = __webpack_require__(143),
-    isSymbol = __webpack_require__(186),
-    stringToPath = __webpack_require__(440),
-    toKey = __webpack_require__(503),
-    toString = __webpack_require__(428);
+"use strict";
 
-/**
- * Converts `value` to a property path array.
- *
- * @static
- * @memberOf _
- * @since 4.0.0
- * @category Util
- * @param {*} value The value to convert.
- * @returns {Array} Returns the new property path array.
- * @example
- *
- * _.toPath('a.b.c');
- * // => ['a', 'b', 'c']
- *
- * _.toPath('a[0].b.c');
- * // => ['a', '0', 'b', 'c']
- */
-function toPath(value) {
-  if (isArray(value)) {
-    return arrayMap(value, toKey);
+
+var trim = __webpack_require__(860)
+var word = __webpack_require__(122)
+var whitespace = __webpack_require__(578)
+var locate = __webpack_require__(99)
+
+module.exports = emphasis
+emphasis.locator = locate
+
+var asterisk = '*'
+var underscore = '_'
+var backslash = '\\'
+
+function emphasis(eat, value, silent) {
+  var self = this
+  var index = 0
+  var character = value.charAt(index)
+  var now
+  var pedantic
+  var marker
+  var queue
+  var subvalue
+  var length
+  var previous
+
+  if (character !== asterisk && character !== underscore) {
+    return
   }
-  return isSymbol(value) ? [value] : copyArray(stringToPath(toString(value)));
-}
 
-module.exports = toPath;
+  pedantic = self.options.pedantic
+  subvalue = character
+  marker = character
+  length = value.length
+  index++
+  queue = ''
+  character = ''
+
+  if (pedantic && whitespace(value.charAt(index))) {
+    return
+  }
+
+  while (index < length) {
+    previous = character
+    character = value.charAt(index)
+
+    if (character === marker && (!pedantic || !whitespace(previous))) {
+      character = value.charAt(++index)
+
+      if (character !== marker) {
+        if (!trim(queue) || previous === marker) {
+          return
+        }
+
+        if (!pedantic && marker === underscore && word(character)) {
+          queue += marker
+          continue
+        }
+
+        /* istanbul ignore if - never used (yet) */
+        if (silent) {
+          return true
+        }
+
+        now = eat.now()
+        now.column++
+        now.offset++
+
+        return eat(subvalue + queue + marker)({
+          type: 'emphasis',
+          children: self.tokenizeInline(queue, now)
+        })
+      }
+
+      queue += marker
+    }
+
+    if (!pedantic && character === backslash) {
+      queue += character
+      character = value.charAt(++index)
+    }
+
+    queue += character
+    index++
+  }
+}
 
 
 /***/ }),
@@ -2803,6 +3380,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const issues_1 = __webpack_require__(244);
+const markdown_1 = __webpack_require__(184);
 const run = async (repoToken) => {
     const client = github.getOctokit(repoToken);
     const { issue } = github.context.payload;
@@ -2810,8 +3388,8 @@ const run = async (repoToken) => {
         core.warning('no issue body in event payload');
         return;
     }
-    const { sections } = issues_1.parseIssue(issue.body);
-    const section = issues_1.findSectionByLooseTitle(sections, 'platform');
+    const { sections } = markdown_1.parseMarkdownIntoSections(issue.body);
+    const section = markdown_1.findSectionByLooseTitle(sections, 'platform');
     if (!section) {
         core.warning('no platform section in issue body');
         return;
@@ -2830,23 +3408,206 @@ exports.default = run;
 
 
 /***/ }),
-/* 109 */,
+/* 109 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var isStrictComparable = __webpack_require__(258),
+    keys = __webpack_require__(863);
+
+/**
+ * Gets the property names, values, and compare flags of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @returns {Array} Returns the match data of `object`.
+ */
+function getMatchData(object) {
+  var result = keys(object),
+      length = result.length;
+
+  while (length--) {
+    var key = result[length],
+        value = object[key];
+
+    result[length] = [key, value, isStrictComparable(value)];
+  }
+  return result;
+}
+
+module.exports = getMatchData;
+
+
+/***/ }),
 /* 110 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
 
-var alphabetical = __webpack_require__(341)
-var decimal = __webpack_require__(926)
+const fs = __webpack_require__(598)
+const path = __webpack_require__(622)
+const mkdirsSync = __webpack_require__(727).mkdirsSync
+const utimesMillisSync = __webpack_require__(916).utimesMillisSync
+const stat = __webpack_require__(425)
 
-module.exports = alphanumerical
+function copySync (src, dest, opts) {
+  if (typeof opts === 'function') {
+    opts = { filter: opts }
+  }
 
-// Check if the given character code, or the character code at the first
-// character, is alphanumerical.
-function alphanumerical(character) {
-  return alphabetical(character) || decimal(character)
+  opts = opts || {}
+  opts.clobber = 'clobber' in opts ? !!opts.clobber : true // default to true for now
+  opts.overwrite = 'overwrite' in opts ? !!opts.overwrite : opts.clobber // overwrite falls back to clobber
+
+  // Warn about using preserveTimestamps on 32-bit node
+  if (opts.preserveTimestamps && process.arch === 'ia32') {
+    console.warn(`fs-extra: Using the preserveTimestamps option in 32-bit node is not recommended;\n
+    see https://github.com/jprichardson/node-fs-extra/issues/269`)
+  }
+
+  const { srcStat, destStat } = stat.checkPathsSync(src, dest, 'copy')
+  stat.checkParentPathsSync(src, srcStat, dest, 'copy')
+  return handleFilterAndCopy(destStat, src, dest, opts)
 }
+
+function handleFilterAndCopy (destStat, src, dest, opts) {
+  if (opts.filter && !opts.filter(src, dest)) return
+  const destParent = path.dirname(dest)
+  if (!fs.existsSync(destParent)) mkdirsSync(destParent)
+  return startCopy(destStat, src, dest, opts)
+}
+
+function startCopy (destStat, src, dest, opts) {
+  if (opts.filter && !opts.filter(src, dest)) return
+  return getStats(destStat, src, dest, opts)
+}
+
+function getStats (destStat, src, dest, opts) {
+  const statSync = opts.dereference ? fs.statSync : fs.lstatSync
+  const srcStat = statSync(src)
+
+  if (srcStat.isDirectory()) return onDir(srcStat, destStat, src, dest, opts)
+  else if (srcStat.isFile() ||
+           srcStat.isCharacterDevice() ||
+           srcStat.isBlockDevice()) return onFile(srcStat, destStat, src, dest, opts)
+  else if (srcStat.isSymbolicLink()) return onLink(destStat, src, dest, opts)
+}
+
+function onFile (srcStat, destStat, src, dest, opts) {
+  if (!destStat) return copyFile(srcStat, src, dest, opts)
+  return mayCopyFile(srcStat, src, dest, opts)
+}
+
+function mayCopyFile (srcStat, src, dest, opts) {
+  if (opts.overwrite) {
+    fs.unlinkSync(dest)
+    return copyFile(srcStat, src, dest, opts)
+  } else if (opts.errorOnExist) {
+    throw new Error(`'${dest}' already exists`)
+  }
+}
+
+function copyFile (srcStat, src, dest, opts) {
+  fs.copyFileSync(src, dest)
+  if (opts.preserveTimestamps) handleTimestamps(srcStat.mode, src, dest)
+  return setDestMode(dest, srcStat.mode)
+}
+
+function handleTimestamps (srcMode, src, dest) {
+  // Make sure the file is writable before setting the timestamp
+  // otherwise open fails with EPERM when invoked with 'r+'
+  // (through utimes call)
+  if (fileIsNotWritable(srcMode)) makeFileWritable(dest, srcMode)
+  return setDestTimestamps(src, dest)
+}
+
+function fileIsNotWritable (srcMode) {
+  return (srcMode & 0o200) === 0
+}
+
+function makeFileWritable (dest, srcMode) {
+  return setDestMode(dest, srcMode | 0o200)
+}
+
+function setDestMode (dest, srcMode) {
+  return fs.chmodSync(dest, srcMode)
+}
+
+function setDestTimestamps (src, dest) {
+  // The initial srcStat.atime cannot be trusted
+  // because it is modified by the read(2) system call
+  // (See https://nodejs.org/api/fs.html#fs_stat_time_values)
+  const updatedSrcStat = fs.statSync(src)
+  return utimesMillisSync(dest, updatedSrcStat.atime, updatedSrcStat.mtime)
+}
+
+function onDir (srcStat, destStat, src, dest, opts) {
+  if (!destStat) return mkDirAndCopy(srcStat.mode, src, dest, opts)
+  if (destStat && !destStat.isDirectory()) {
+    throw new Error(`Cannot overwrite non-directory '${dest}' with directory '${src}'.`)
+  }
+  return copyDir(src, dest, opts)
+}
+
+function mkDirAndCopy (srcMode, src, dest, opts) {
+  fs.mkdirSync(dest)
+  copyDir(src, dest, opts)
+  return setDestMode(dest, srcMode)
+}
+
+function copyDir (src, dest, opts) {
+  fs.readdirSync(src).forEach(item => copyDirItem(item, src, dest, opts))
+}
+
+function copyDirItem (item, src, dest, opts) {
+  const srcItem = path.join(src, item)
+  const destItem = path.join(dest, item)
+  const { destStat } = stat.checkPathsSync(srcItem, destItem, 'copy')
+  return startCopy(destStat, srcItem, destItem, opts)
+}
+
+function onLink (destStat, src, dest, opts) {
+  let resolvedSrc = fs.readlinkSync(src)
+  if (opts.dereference) {
+    resolvedSrc = path.resolve(process.cwd(), resolvedSrc)
+  }
+
+  if (!destStat) {
+    return fs.symlinkSync(resolvedSrc, dest)
+  } else {
+    let resolvedDest
+    try {
+      resolvedDest = fs.readlinkSync(dest)
+    } catch (err) {
+      // dest exists and is a regular file or directory,
+      // Windows may throw UNKNOWN error. If dest already exists,
+      // fs throws error anyway, so no need to guard against it here.
+      if (err.code === 'EINVAL' || err.code === 'UNKNOWN') return fs.symlinkSync(resolvedSrc, dest)
+      throw err
+    }
+    if (opts.dereference) {
+      resolvedDest = path.resolve(process.cwd(), resolvedDest)
+    }
+    if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
+      throw new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`)
+    }
+
+    // prevent copy if src is a subdir of dest since unlinking
+    // dest in this case would result in removing src contents
+    // and therefore a broken symlink would be created.
+    if (fs.statSync(dest).isDirectory() && stat.isSrcSubdir(resolvedDest, resolvedSrc)) {
+      throw new Error(`Cannot overwrite '${resolvedDest}' with '${resolvedSrc}'.`)
+    }
+    return copyLink(resolvedSrc, dest)
+  }
+}
+
+function copyLink (resolvedSrc, dest) {
+  fs.unlinkSync(dest)
+  return fs.symlinkSync(resolvedSrc, dest)
+}
+
+module.exports = copySync
 
 
 /***/ }),
@@ -3465,34 +4226,39 @@ function trough() {
 /* 136 */,
 /* 137 */,
 /* 138 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
-var memoize = __webpack_require__(507);
+/* module decorator */ module = __webpack_require__.nmd(module);
+var freeGlobal = __webpack_require__(973);
 
-/** Used as the maximum memoize cache size. */
-var MAX_MEMOIZE_SIZE = 500;
+/** Detect free variable `exports`. */
+var freeExports =  true && exports && !exports.nodeType && exports;
 
-/**
- * A specialized version of `_.memoize` which clears the memoized function's
- * cache when it exceeds `MAX_MEMOIZE_SIZE`.
- *
- * @private
- * @param {Function} func The function to have its output memoized.
- * @returns {Function} Returns the new memoized function.
- */
-function memoizeCapped(func) {
-  var result = memoize(func, function(key) {
-    if (cache.size === MAX_MEMOIZE_SIZE) {
-      cache.clear();
+/** Detect free variable `module`. */
+var freeModule = freeExports && "object" == 'object' && module && !module.nodeType && module;
+
+/** Detect the popular CommonJS extension `module.exports`. */
+var moduleExports = freeModule && freeModule.exports === freeExports;
+
+/** Detect free variable `process` from Node.js. */
+var freeProcess = moduleExports && freeGlobal.process;
+
+/** Used to access faster Node.js helpers. */
+var nodeUtil = (function() {
+  try {
+    // Use `util.types` for Node.js 10+.
+    var types = freeModule && freeModule.require && freeModule.require('util').types;
+
+    if (types) {
+      return types;
     }
-    return key;
-  });
 
-  var cache = result.cache;
-  return result;
-}
+    // Legacy `process.binding('util')` for Node.js < 10.
+    return freeProcess && freeProcess.binding && freeProcess.binding('util');
+  } catch (e) {}
+}());
 
-module.exports = memoizeCapped;
+module.exports = nodeUtil;
 
 
 /***/ }),
@@ -3876,23 +4642,39 @@ module.exports.MaxBufferError = MaxBufferError;
 /* 146 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var identity = __webpack_require__(83),
-    metaMap = __webpack_require__(156);
+var isFunction = __webpack_require__(10),
+    isLength = __webpack_require__(611);
 
 /**
- * The base implementation of `setData` without support for hot loop shorting.
+ * Checks if `value` is array-like. A value is considered array-like if it's
+ * not a function and has a `value.length` that's an integer greater than or
+ * equal to `0` and less than or equal to `Number.MAX_SAFE_INTEGER`.
  *
- * @private
- * @param {Function} func The function to associate metadata with.
- * @param {*} data The metadata.
- * @returns {Function} Returns `func`.
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is array-like, else `false`.
+ * @example
+ *
+ * _.isArrayLike([1, 2, 3]);
+ * // => true
+ *
+ * _.isArrayLike(document.body.children);
+ * // => true
+ *
+ * _.isArrayLike('abc');
+ * // => true
+ *
+ * _.isArrayLike(_.noop);
+ * // => false
  */
-var baseSetData = !metaMap ? identity : function(func, data) {
-  metaMap.set(func, data);
-  return func;
-};
+function isArrayLike(value) {
+  return value != null && isLength(value.length) && !isFunction(value);
+}
 
-module.exports = baseSetData;
+module.exports = isArrayLike;
 
 
 /***/ }),
@@ -3945,75 +4727,125 @@ module.exports = composeArgs;
 /* 149 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseTimes = __webpack_require__(553),
-    isArguments = __webpack_require__(460),
-    isArray = __webpack_require__(143),
-    isBuffer = __webpack_require__(408),
-    isIndex = __webpack_require__(160),
-    isTypedArray = __webpack_require__(850);
-
-/** Used for built-in method references. */
-var objectProto = Object.prototype;
-
-/** Used to check objects for own properties. */
-var hasOwnProperty = objectProto.hasOwnProperty;
-
-/**
- * Creates an array of the enumerable property names of the array-like `value`.
- *
- * @private
- * @param {*} value The value to query.
- * @param {boolean} inherited Specify returning inherited property names.
- * @returns {Array} Returns the array of property names.
- */
-function arrayLikeKeys(value, inherited) {
-  var isArr = isArray(value),
-      isArg = !isArr && isArguments(value),
-      isBuff = !isArr && !isArg && isBuffer(value),
-      isType = !isArr && !isArg && !isBuff && isTypedArray(value),
-      skipIndexes = isArr || isArg || isBuff || isType,
-      result = skipIndexes ? baseTimes(value.length, String) : [],
-      length = result.length;
-
-  for (var key in value) {
-    if ((inherited || hasOwnProperty.call(value, key)) &&
-        !(skipIndexes && (
-           // Safari 9 has enumerable `arguments.length` in strict mode.
-           key == 'length' ||
-           // Node.js 0.10 has enumerable non-index properties on buffers.
-           (isBuff && (key == 'offset' || key == 'parent')) ||
-           // PhantomJS 2 has enumerable non-index properties on typed arrays.
-           (isType && (key == 'buffer' || key == 'byteLength' || key == 'byteOffset')) ||
-           // Skip index properties.
-           isIndex(key, length)
-        ))) {
-      result.push(key);
-    }
-  }
-  return result;
-}
-
-module.exports = arrayLikeKeys;
-
-
-/***/ }),
-/* 150 */,
-/* 151 */
-/***/ (function(module) {
-
 "use strict";
 
 
-module.exports = tableCell
+const u = __webpack_require__(676).fromCallback
+const path = __webpack_require__(622)
+const fs = __webpack_require__(598)
+const mkdir = __webpack_require__(727)
 
-var lineFeed = /\r?\n/g
+function createFile (file, callback) {
+  function makeFile () {
+    fs.writeFile(file, '', err => {
+      if (err) return callback(err)
+      callback()
+    })
+  }
 
-function tableCell(node) {
-  return this.all(node).join('').replace(lineFeed, ' ')
+  fs.stat(file, (err, stats) => { // eslint-disable-line handle-callback-err
+    if (!err && stats.isFile()) return callback()
+    const dir = path.dirname(file)
+    fs.stat(dir, (err, stats) => {
+      if (err) {
+        // if the directory doesn't exist, make it
+        if (err.code === 'ENOENT') {
+          return mkdir.mkdirs(dir, err => {
+            if (err) return callback(err)
+            makeFile()
+          })
+        }
+        return callback(err)
+      }
+
+      if (stats.isDirectory()) makeFile()
+      else {
+        // parent is not a directory
+        // This is just to cause an internal ENOTDIR error to be thrown
+        fs.readdir(dir, err => {
+          if (err) return callback(err)
+        })
+      }
+    })
+  })
+}
+
+function createFileSync (file) {
+  let stats
+  try {
+    stats = fs.statSync(file)
+  } catch {}
+  if (stats && stats.isFile()) return
+
+  const dir = path.dirname(file)
+  try {
+    if (!fs.statSync(dir).isDirectory()) {
+      // parent is not a directory
+      // This is just to cause an internal ENOTDIR error to be thrown
+      fs.readdirSync(dir)
+    }
+  } catch (err) {
+    // If the stat call above failed because the directory doesn't exist, create it
+    if (err && err.code === 'ENOENT') mkdir.mkdirsSync(dir)
+    else throw err
+  }
+
+  fs.writeFileSync(file, '')
+}
+
+module.exports = {
+  createFile: u(createFile),
+  createFileSync
 }
 
 
 /***/ }),
+/* 150 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* module decorator */ module = __webpack_require__.nmd(module);
+var root = __webpack_require__(824),
+    stubFalse = __webpack_require__(451);
+
+/** Detect free variable `exports`. */
+var freeExports =  true && exports && !exports.nodeType && exports;
+
+/** Detect free variable `module`. */
+var freeModule = freeExports && "object" == 'object' && module && !module.nodeType && module;
+
+/** Detect the popular CommonJS extension `module.exports`. */
+var moduleExports = freeModule && freeModule.exports === freeExports;
+
+/** Built-in value references. */
+var Buffer = moduleExports ? root.Buffer : undefined;
+
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeIsBuffer = Buffer ? Buffer.isBuffer : undefined;
+
+/**
+ * Checks if `value` is a buffer.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.3.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a buffer, else `false`.
+ * @example
+ *
+ * _.isBuffer(new Buffer(2));
+ * // => true
+ *
+ * _.isBuffer(new Uint8Array(2));
+ * // => false
+ */
+var isBuffer = nativeIsBuffer || stubFalse;
+
+module.exports = isBuffer;
+
+
+/***/ }),
+/* 151 */,
 /* 152 */,
 /* 153 */,
 /* 154 */
@@ -4149,28 +4981,13 @@ function paragraph(eat, value, silent) {
 /***/ }),
 /* 158 */,
 /* 159 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var coreJsData = __webpack_require__(396);
-
-/** Used to detect methods masquerading as native. */
-var maskSrcKey = (function() {
-  var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || '');
-  return uid ? ('Symbol(src)_1.' + uid) : '';
-}());
-
-/**
- * Checks if `func` has its source masked.
- *
- * @private
- * @param {Function} func The function to check.
- * @returns {boolean} Returns `true` if `func` is masked, else `false`.
- */
-function isMasked(func) {
-  return !!maskSrcKey && (maskSrcKey in func);
+module.exports = r => {
+  const n = process.versions.node.split('.').map(x => parseInt(x, 10))
+  r = r.split('.').map(x => parseInt(x, 10))
+  return n[0] > r[0] || (n[0] === r[0] && (n[1] > r[1] || (n[1] === r[1] && n[2] >= r[2])))
 }
-
-module.exports = isMasked;
 
 
 /***/ }),
@@ -4273,7 +5090,29 @@ module.exports = opts => {
 /***/ }),
 /* 169 */,
 /* 170 */,
-/* 171 */,
+/* 171 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const u = __webpack_require__(676).fromPromise
+const jsonFile = __webpack_require__(792)
+
+jsonFile.outputJson = u(__webpack_require__(695))
+jsonFile.outputJsonSync = __webpack_require__(628)
+// aliases
+jsonFile.outputJSON = jsonFile.outputJson
+jsonFile.outputJSONSync = jsonFile.outputJsonSync
+jsonFile.writeJSON = jsonFile.writeJson
+jsonFile.writeJSONSync = jsonFile.writeJsonSync
+jsonFile.readJSON = jsonFile.readJson
+jsonFile.readJSONSync = jsonFile.readJsonSync
+
+module.exports = jsonFile
+
+
+/***/ }),
 /* 172 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -4394,10 +5233,38 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const remark_1 = __importDefault(__webpack_require__(781));
+exports.parseMarkdownIntoSections = (markdown) => {
+    const nodes = exports.parseMarkdown(markdown);
+    const sections = [];
+    for (const node of nodes) {
+        if (node.type === 'heading') {
+            sections.push({
+                title: node.children[0].value,
+                nodes: getSectionNodes(node, nodes),
+            });
+        }
+    }
+    return { sections };
+};
+exports.findSectionByLooseTitle = (sections, title) => {
+    return sections.find(section => section.title.toLowerCase().includes(title.toLowerCase()));
+};
 exports.parseMarkdown = (markdown) => {
     const lexer = remark_1.default();
     const nodes = lexer.parse(markdown).children;
     return nodes;
+};
+const getSectionNodes = (header, nodes) => {
+    const section = [header];
+    const idx = nodes.indexOf(header);
+    for (let i = idx + 1; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node.type === 'heading') {
+            break;
+        }
+        section.push(node);
+    }
+    return section;
 };
 
 
@@ -4517,10 +5384,10 @@ module.exports = baseIsEqual;
 /* 191 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var convert = __webpack_require__(675),
+var convert = __webpack_require__(822),
     func = convert('intersection', __webpack_require__(217));
 
-func.placeholder = __webpack_require__(602);
+func.placeholder = __webpack_require__(801);
 module.exports = func;
 
 
@@ -4528,39 +5395,32 @@ module.exports = func;
 /* 192 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var isFunction = __webpack_require__(10),
-    isLength = __webpack_require__(56);
+var memoize = __webpack_require__(507);
+
+/** Used as the maximum memoize cache size. */
+var MAX_MEMOIZE_SIZE = 500;
 
 /**
- * Checks if `value` is array-like. A value is considered array-like if it's
- * not a function and has a `value.length` that's an integer greater than or
- * equal to `0` and less than or equal to `Number.MAX_SAFE_INTEGER`.
+ * A specialized version of `_.memoize` which clears the memoized function's
+ * cache when it exceeds `MAX_MEMOIZE_SIZE`.
  *
- * @static
- * @memberOf _
- * @since 4.0.0
- * @category Lang
- * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if `value` is array-like, else `false`.
- * @example
- *
- * _.isArrayLike([1, 2, 3]);
- * // => true
- *
- * _.isArrayLike(document.body.children);
- * // => true
- *
- * _.isArrayLike('abc');
- * // => true
- *
- * _.isArrayLike(_.noop);
- * // => false
+ * @private
+ * @param {Function} func The function to have its output memoized.
+ * @returns {Function} Returns the new memoized function.
  */
-function isArrayLike(value) {
-  return value != null && isLength(value.length) && !isFunction(value);
+function memoizeCapped(func) {
+  var result = memoize(func, function(key) {
+    if (cache.size === MAX_MEMOIZE_SIZE) {
+      cache.clear();
+    }
+    return key;
+  });
+
+  var cache = result.cache;
+  return result;
 }
 
-module.exports = isArrayLike;
+module.exports = memoizeCapped;
 
 
 /***/ }),
@@ -4575,7 +5435,7 @@ var trim = __webpack_require__(860)
 var repeat = __webpack_require__(8)
 var decimal = __webpack_require__(926)
 var getIndent = __webpack_require__(739)
-var removeIndent = __webpack_require__(774)
+var removeIndent = __webpack_require__(584)
 var interrupt = __webpack_require__(853)
 
 module.exports = list
@@ -5328,31 +6188,9 @@ function all(parent) {
 
 /***/ }),
 /* 204 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var baseCreate = __webpack_require__(782),
-    baseLodash = __webpack_require__(681);
-
-/**
- * The base constructor for creating `lodash` wrapper objects.
- *
- * @private
- * @param {*} value The value to wrap.
- * @param {boolean} [chainAll] Enable explicit method chain sequences.
- */
-function LodashWrapper(value, chainAll) {
-  this.__wrapped__ = value;
-  this.__actions__ = [];
-  this.__chain__ = !!chainAll;
-  this.__index__ = 0;
-  this.__values__ = undefined;
-}
-
-LodashWrapper.prototype = baseCreate(baseLodash.prototype);
-LodashWrapper.prototype.constructor = LodashWrapper;
-
-module.exports = LodashWrapper;
-
+module.exports = {"nbsp":" ","iexcl":"¡","cent":"¢","pound":"£","curren":"¤","yen":"¥","brvbar":"¦","sect":"§","uml":"¨","copy":"©","ordf":"ª","laquo":"«","not":"¬","shy":"­","reg":"®","macr":"¯","deg":"°","plusmn":"±","sup2":"²","sup3":"³","acute":"´","micro":"µ","para":"¶","middot":"·","cedil":"¸","sup1":"¹","ordm":"º","raquo":"»","frac14":"¼","frac12":"½","frac34":"¾","iquest":"¿","Agrave":"À","Aacute":"Á","Acirc":"Â","Atilde":"Ã","Auml":"Ä","Aring":"Å","AElig":"Æ","Ccedil":"Ç","Egrave":"È","Eacute":"É","Ecirc":"Ê","Euml":"Ë","Igrave":"Ì","Iacute":"Í","Icirc":"Î","Iuml":"Ï","ETH":"Ð","Ntilde":"Ñ","Ograve":"Ò","Oacute":"Ó","Ocirc":"Ô","Otilde":"Õ","Ouml":"Ö","times":"×","Oslash":"Ø","Ugrave":"Ù","Uacute":"Ú","Ucirc":"Û","Uuml":"Ü","Yacute":"Ý","THORN":"Þ","szlig":"ß","agrave":"à","aacute":"á","acirc":"â","atilde":"ã","auml":"ä","aring":"å","aelig":"æ","ccedil":"ç","egrave":"è","eacute":"é","ecirc":"ê","euml":"ë","igrave":"ì","iacute":"í","icirc":"î","iuml":"ï","eth":"ð","ntilde":"ñ","ograve":"ò","oacute":"ó","ocirc":"ô","otilde":"õ","ouml":"ö","divide":"÷","oslash":"ø","ugrave":"ù","uacute":"ú","ucirc":"û","uuml":"ü","yacute":"ý","thorn":"þ","yuml":"ÿ","fnof":"ƒ","Alpha":"Α","Beta":"Β","Gamma":"Γ","Delta":"Δ","Epsilon":"Ε","Zeta":"Ζ","Eta":"Η","Theta":"Θ","Iota":"Ι","Kappa":"Κ","Lambda":"Λ","Mu":"Μ","Nu":"Ν","Xi":"Ξ","Omicron":"Ο","Pi":"Π","Rho":"Ρ","Sigma":"Σ","Tau":"Τ","Upsilon":"Υ","Phi":"Φ","Chi":"Χ","Psi":"Ψ","Omega":"Ω","alpha":"α","beta":"β","gamma":"γ","delta":"δ","epsilon":"ε","zeta":"ζ","eta":"η","theta":"θ","iota":"ι","kappa":"κ","lambda":"λ","mu":"μ","nu":"ν","xi":"ξ","omicron":"ο","pi":"π","rho":"ρ","sigmaf":"ς","sigma":"σ","tau":"τ","upsilon":"υ","phi":"φ","chi":"χ","psi":"ψ","omega":"ω","thetasym":"ϑ","upsih":"ϒ","piv":"ϖ","bull":"•","hellip":"…","prime":"′","Prime":"″","oline":"‾","frasl":"⁄","weierp":"℘","image":"ℑ","real":"ℜ","trade":"™","alefsym":"ℵ","larr":"←","uarr":"↑","rarr":"→","darr":"↓","harr":"↔","crarr":"↵","lArr":"⇐","uArr":"⇑","rArr":"⇒","dArr":"⇓","hArr":"⇔","forall":"∀","part":"∂","exist":"∃","empty":"∅","nabla":"∇","isin":"∈","notin":"∉","ni":"∋","prod":"∏","sum":"∑","minus":"−","lowast":"∗","radic":"√","prop":"∝","infin":"∞","ang":"∠","and":"∧","or":"∨","cap":"∩","cup":"∪","int":"∫","there4":"∴","sim":"∼","cong":"≅","asymp":"≈","ne":"≠","equiv":"≡","le":"≤","ge":"≥","sub":"⊂","sup":"⊃","nsub":"⊄","sube":"⊆","supe":"⊇","oplus":"⊕","otimes":"⊗","perp":"⊥","sdot":"⋅","lceil":"⌈","rceil":"⌉","lfloor":"⌊","rfloor":"⌋","lang":"〈","rang":"〉","loz":"◊","spades":"♠","clubs":"♣","hearts":"♥","diams":"♦","quot":"\"","amp":"&","lt":"<","gt":">","OElig":"Œ","oelig":"œ","Scaron":"Š","scaron":"š","Yuml":"Ÿ","circ":"ˆ","tilde":"˜","ensp":" ","emsp":" ","thinsp":" ","zwnj":"‌","zwj":"‍","lrm":"‎","rlm":"‏","ndash":"–","mdash":"—","lsquo":"‘","rsquo":"’","sbquo":"‚","ldquo":"“","rdquo":"”","bdquo":"„","dagger":"†","Dagger":"‡","permil":"‰","lsaquo":"‹","rsaquo":"›","euro":"€"};
 
 /***/ }),
 /* 205 */,
@@ -5418,7 +6256,39 @@ module.exports = require("https");
 /***/ }),
 /* 212 */,
 /* 213 */,
-/* 214 */,
+/* 214 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var ListCache = __webpack_require__(670),
+    stackClear = __webpack_require__(564),
+    stackDelete = __webpack_require__(844),
+    stackGet = __webpack_require__(380),
+    stackHas = __webpack_require__(896),
+    stackSet = __webpack_require__(687);
+
+/**
+ * Creates a stack cache object to store key-value pairs.
+ *
+ * @private
+ * @constructor
+ * @param {Array} [entries] The key-value pairs to cache.
+ */
+function Stack(entries) {
+  var data = this.__data__ = new ListCache(entries);
+  this.size = data.size;
+}
+
+// Add methods to `Stack`.
+Stack.prototype.clear = stackClear;
+Stack.prototype['delete'] = stackDelete;
+Stack.prototype.get = stackGet;
+Stack.prototype.has = stackHas;
+Stack.prototype.set = stackSet;
+
+module.exports = Stack;
+
+
+/***/ }),
 /* 215 */
 /***/ (function(module) {
 
@@ -5487,7 +6357,7 @@ function escapes(options) {
 /* 217 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var arrayMap = __webpack_require__(727),
+var arrayMap = __webpack_require__(766),
     baseIntersection = __webpack_require__(830),
     baseRest = __webpack_require__(272),
     castArrayLikeObject = __webpack_require__(987);
@@ -5596,114 +6466,288 @@ function mergeable(node, commonmark) {
 /* 224 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var composeArgs = __webpack_require__(147),
-    composeArgsRight = __webpack_require__(734),
-    countHolders = __webpack_require__(178),
-    createCtor = __webpack_require__(546),
-    createRecurry = __webpack_require__(673),
-    getHolder = __webpack_require__(683),
-    reorder = __webpack_require__(291),
-    replaceHolders = __webpack_require__(944),
-    root = __webpack_require__(824);
+"use strict";
 
-/** Used to compose bitmasks for function metadata. */
-var WRAP_BIND_FLAG = 1,
-    WRAP_BIND_KEY_FLAG = 2,
-    WRAP_CURRY_FLAG = 8,
-    WRAP_CURRY_RIGHT_FLAG = 16,
-    WRAP_ARY_FLAG = 128,
-    WRAP_FLIP_FLAG = 512;
 
-/**
- * Creates a function that wraps `func` to invoke it with optional `this`
- * binding of `thisArg`, partial application, and currying.
- *
- * @private
- * @param {Function|string} func The function or method name to wrap.
- * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
- * @param {*} [thisArg] The `this` binding of `func`.
- * @param {Array} [partials] The arguments to prepend to those provided to
- *  the new function.
- * @param {Array} [holders] The `partials` placeholder indexes.
- * @param {Array} [partialsRight] The arguments to append to those provided
- *  to the new function.
- * @param {Array} [holdersRight] The `partialsRight` placeholder indexes.
- * @param {Array} [argPos] The argument positions of the new function.
- * @param {number} [ary] The arity cap of `func`.
- * @param {number} [arity] The arity of `func`.
- * @returns {Function} Returns the new wrapped function.
- */
-function createHybrid(func, bitmask, thisArg, partials, holders, partialsRight, holdersRight, argPos, ary, arity) {
-  var isAry = bitmask & WRAP_ARY_FLAG,
-      isBind = bitmask & WRAP_BIND_FLAG,
-      isBindKey = bitmask & WRAP_BIND_KEY_FLAG,
-      isCurried = bitmask & (WRAP_CURRY_FLAG | WRAP_CURRY_RIGHT_FLAG),
-      isFlip = bitmask & WRAP_FLIP_FLAG,
-      Ctor = isBindKey ? undefined : createCtor(func);
+var whitespace = __webpack_require__(578)
 
-  function wrapper() {
-    var length = arguments.length,
-        args = Array(length),
-        index = length;
+module.exports = table
 
-    while (index--) {
-      args[index] = arguments[index];
-    }
-    if (isCurried) {
-      var placeholder = getHolder(wrapper),
-          holdersCount = countHolders(args, placeholder);
-    }
-    if (partials) {
-      args = composeArgs(args, partials, holders, isCurried);
-    }
-    if (partialsRight) {
-      args = composeArgsRight(args, partialsRight, holdersRight, isCurried);
-    }
-    length -= holdersCount;
-    if (isCurried && length < arity) {
-      var newHolders = replaceHolders(args, placeholder);
-      return createRecurry(
-        func, bitmask, createHybrid, wrapper.placeholder, thisArg,
-        args, newHolders, argPos, ary, arity - length
-      );
-    }
-    var thisBinding = isBind ? thisArg : this,
-        fn = isBindKey ? thisBinding[func] : func;
+var tab = '\t'
+var lineFeed = '\n'
+var space = ' '
+var dash = '-'
+var colon = ':'
+var backslash = '\\'
+var verticalBar = '|'
 
-    length = args.length;
-    if (argPos) {
-      args = reorder(args, argPos);
-    } else if (isFlip && length > 1) {
-      args.reverse();
-    }
-    if (isAry && ary < length) {
-      args.length = ary;
-    }
-    if (this && this !== root && this instanceof wrapper) {
-      fn = Ctor || createCtor(fn);
-    }
-    return fn.apply(thisBinding, args);
+var minColumns = 1
+var minRows = 2
+
+var left = 'left'
+var center = 'center'
+var right = 'right'
+
+function table(eat, value, silent) {
+  var self = this
+  var index
+  var alignments
+  var alignment
+  var subvalue
+  var row
+  var length
+  var lines
+  var queue
+  var character
+  var hasDash
+  var align
+  var cell
+  var preamble
+  var now
+  var position
+  var lineCount
+  var line
+  var rows
+  var table
+  var lineIndex
+  var pipeIndex
+  var first
+
+  // Exit when not in gfm-mode.
+  if (!self.options.gfm) {
+    return
   }
-  return wrapper;
-}
 
-module.exports = createHybrid;
+  // Get the rows.
+  // Detecting tables soon is hard, so there are some checks for performance
+  // here, such as the minimum number of rows, and allowed characters in the
+  // alignment row.
+  index = 0
+  lineCount = 0
+  length = value.length + 1
+  lines = []
+
+  while (index < length) {
+    lineIndex = value.indexOf(lineFeed, index)
+    pipeIndex = value.indexOf(verticalBar, index + 1)
+
+    if (lineIndex === -1) {
+      lineIndex = value.length
+    }
+
+    if (pipeIndex === -1 || pipeIndex > lineIndex) {
+      if (lineCount < minRows) {
+        return
+      }
+
+      break
+    }
+
+    lines.push(value.slice(index, lineIndex))
+    lineCount++
+    index = lineIndex + 1
+  }
+
+  // Parse the alignment row.
+  subvalue = lines.join(lineFeed)
+  alignments = lines.splice(1, 1)[0] || []
+  index = 0
+  length = alignments.length
+  lineCount--
+  alignment = false
+  align = []
+
+  while (index < length) {
+    character = alignments.charAt(index)
+
+    if (character === verticalBar) {
+      hasDash = null
+
+      if (alignment === false) {
+        if (first === false) {
+          return
+        }
+      } else {
+        align.push(alignment)
+        alignment = false
+      }
+
+      first = false
+    } else if (character === dash) {
+      hasDash = true
+      alignment = alignment || null
+    } else if (character === colon) {
+      if (alignment === left) {
+        alignment = center
+      } else if (hasDash && alignment === null) {
+        alignment = right
+      } else {
+        alignment = left
+      }
+    } else if (!whitespace(character)) {
+      return
+    }
+
+    index++
+  }
+
+  if (alignment !== false) {
+    align.push(alignment)
+  }
+
+  // Exit when without enough columns.
+  if (align.length < minColumns) {
+    return
+  }
+
+  /* istanbul ignore if - never used (yet) */
+  if (silent) {
+    return true
+  }
+
+  // Parse the rows.
+  position = -1
+  rows = []
+
+  table = eat(subvalue).reset({type: 'table', align: align, children: rows})
+
+  while (++position < lineCount) {
+    line = lines[position]
+    row = {type: 'tableRow', children: []}
+
+    // Eat a newline character when this is not the first row.
+    if (position) {
+      eat(lineFeed)
+    }
+
+    // Eat the row.
+    eat(line).reset(row, table)
+
+    length = line.length + 1
+    index = 0
+    queue = ''
+    cell = ''
+    preamble = true
+
+    while (index < length) {
+      character = line.charAt(index)
+
+      if (character === tab || character === space) {
+        if (cell) {
+          queue += character
+        } else {
+          eat(character)
+        }
+
+        index++
+        continue
+      }
+
+      if (character === '' || character === verticalBar) {
+        if (preamble) {
+          eat(character)
+        } else {
+          if ((cell || character) && !preamble) {
+            subvalue = cell
+
+            if (queue.length > 1) {
+              if (character) {
+                subvalue += queue.slice(0, -1)
+                queue = queue.charAt(queue.length - 1)
+              } else {
+                subvalue += queue
+                queue = ''
+              }
+            }
+
+            now = eat.now()
+
+            eat(subvalue)(
+              {type: 'tableCell', children: self.tokenizeInline(cell, now)},
+              row
+            )
+          }
+
+          eat(queue + character)
+
+          queue = ''
+          cell = ''
+        }
+      } else {
+        if (queue) {
+          cell += queue
+          queue = ''
+        }
+
+        cell += character
+
+        if (character === backslash && index !== length - 2) {
+          cell += line.charAt(index + 1)
+          index++
+        }
+      }
+
+      preamble = false
+      index++
+    }
+
+    // Eat the alignment row.
+    if (!position) {
+      eat(lineFeed + alignments)
+    }
+  }
+
+  return table
+}
 
 
 /***/ }),
 /* 225 */,
-/* 226 */,
+/* 226 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = {
+  // Export promiseified graceful-fs:
+  ...__webpack_require__(869),
+  // Export extra methods:
+  ...__webpack_require__(43),
+  ...__webpack_require__(774),
+  ...__webpack_require__(615),
+  ...__webpack_require__(472),
+  ...__webpack_require__(171),
+  ...__webpack_require__(727),
+  ...__webpack_require__(959),
+  ...__webpack_require__(353),
+  ...__webpack_require__(517),
+  ...__webpack_require__(322),
+  ...__webpack_require__(723)
+}
+
+// Export fs.promises as a getter property so that we don't trigger
+// ExperimentalWarning before fs.promises is actually accessed.
+const fs = __webpack_require__(747)
+if (Object.getOwnPropertyDescriptor(fs, 'promises')) {
+  Object.defineProperty(module.exports, 'promises', {
+    get () { return fs.promises }
+  })
+}
+
+
+/***/ }),
 /* 227 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseSetData = __webpack_require__(146),
+var baseSetData = __webpack_require__(82),
     createBind = __webpack_require__(547),
-    createCurry = __webpack_require__(542),
-    createHybrid = __webpack_require__(224),
-    createPartial = __webpack_require__(869),
-    getData = __webpack_require__(418),
+    createCurry = __webpack_require__(953),
+    createHybrid = __webpack_require__(720),
+    createPartial = __webpack_require__(55),
+    getData = __webpack_require__(680),
     mergeData = __webpack_require__(230),
-    setData = __webpack_require__(854),
+    setData = __webpack_require__(488),
     setWrapToString = __webpack_require__(620),
     toInteger = __webpack_require__(528);
 
@@ -5805,7 +6849,73 @@ module.exports = createWrap;
 
 
 /***/ }),
-/* 228 */,
+/* 228 */
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = block
+
+var lineFeed = '\n'
+
+var blank = lineFeed + lineFeed
+var triple = blank + lineFeed
+var comment = blank + '<!---->' + blank
+
+// Stringify a block node with block children (e.g., `root` or `blockquote`).
+// Knows about code following a list, or adjacent lists with similar bullets,
+// and places an extra line feed between them.
+function block(node) {
+  var self = this
+  var options = self.options
+  var fences = options.fences
+  var gap = options.commonmark ? comment : triple
+  var definitionGap = options.tightDefinitions ? lineFeed : blank
+  var values = []
+  var children = node.children
+  var length = children.length
+  var index = -1
+  var previous
+  var child
+
+  while (++index < length) {
+    previous = child
+    child = children[index]
+
+    if (previous) {
+      // A list preceding another list that are equally ordered, or a
+      // list preceding an indented code block, need a gap between them,
+      // so as not to see them as one list, or content of the list,
+      // respectively.
+      //
+      // In commonmark, only something that breaks both up can do that,
+      // so we opt for an empty, invisible comment.  In other flavours,
+      // two blank lines are fine.
+      if (
+        previous.type === 'list' &&
+        ((child.type === 'list' && previous.ordered === child.ordered) ||
+          (child.type === 'code' && !child.lang && !fences))
+      ) {
+        values.push(gap)
+      } else if (
+        previous.type === 'definition' &&
+        child.type === 'definition'
+      ) {
+        values.push(definitionGap)
+      } else {
+        values.push(blank)
+      }
+    }
+
+    values.push(self.visit(child, node))
+  }
+
+  return values.join('')
+}
+
+
+/***/ }),
 /* 229 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -5834,7 +6944,7 @@ module.exports = baseIsMap;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var composeArgs = __webpack_require__(147),
-    composeArgsRight = __webpack_require__(734),
+    composeArgsRight = __webpack_require__(504),
     replaceHolders = __webpack_require__(944);
 
 /** Used as the internal argument placeholder. */
@@ -5954,7 +7064,7 @@ module.exports = baseUnary;
 
 var unherit = __webpack_require__(433)
 var xtend = __webpack_require__(940)
-var Compiler = __webpack_require__(425)
+var Compiler = __webpack_require__(597)
 
 module.exports = stringify
 stringify.Compiler = Compiler
@@ -6122,20 +7232,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const intersection_1 = __importDefault(__webpack_require__(191));
-const markdown_1 = __webpack_require__(184);
-exports.parseIssue = (body) => {
-    const nodes = markdown_1.parseMarkdown(body);
-    const sections = [];
-    for (const node of nodes) {
-        if (node.type === 'heading') {
-            sections.push({
-                title: node.children[0].value,
-                nodes: exports.getSectionNodes(node, nodes),
-            });
-        }
-    }
-    return { sections };
-};
 exports.getPlatforms = (nodes) => {
     const platforms = [];
     for (const node of nodes) {
@@ -6159,21 +7255,6 @@ exports.getPlatforms = (nodes) => {
     }
     return platforms;
 };
-exports.findSectionByLooseTitle = (sections, title) => {
-    return sections.find(section => section.title.toLowerCase().includes(title.toLowerCase()));
-};
-exports.getSectionNodes = (header, nodes) => {
-    const section = [header];
-    const idx = nodes.indexOf(header);
-    for (let i = idx + 1; i < nodes.length; i++) {
-        const node = nodes[i];
-        if (node.type === 'heading') {
-            break;
-        }
-        section.push(node);
-    }
-    return section;
-};
 exports.PLATFORMS = ['android', 'ios', 'electron', 'web'];
 
 
@@ -6185,7 +7266,7 @@ exports.PLATFORMS = ['android', 'ios', 'electron', 'web'];
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var isFunction = __webpack_require__(10),
-    isMasked = __webpack_require__(159),
+    isMasked = __webpack_require__(77),
     isObject = __webpack_require__(988),
     toSource = __webpack_require__(473);
 
@@ -6235,7 +7316,354 @@ module.exports = baseIsNative;
 
 /***/ }),
 /* 249 */,
-/* 250 */,
+/* 250 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var constants = __webpack_require__(619)
+
+var origCwd = process.cwd
+var cwd = null
+
+var platform = process.env.GRACEFUL_FS_PLATFORM || process.platform
+
+process.cwd = function() {
+  if (!cwd)
+    cwd = origCwd.call(process)
+  return cwd
+}
+try {
+  process.cwd()
+} catch (er) {}
+
+var chdir = process.chdir
+process.chdir = function(d) {
+  cwd = null
+  chdir.call(process, d)
+}
+
+module.exports = patch
+
+function patch (fs) {
+  // (re-)implement some things that are known busted or missing.
+
+  // lchmod, broken prior to 0.6.2
+  // back-port the fix here.
+  if (constants.hasOwnProperty('O_SYMLINK') &&
+      process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
+    patchLchmod(fs)
+  }
+
+  // lutimes implementation, or no-op
+  if (!fs.lutimes) {
+    patchLutimes(fs)
+  }
+
+  // https://github.com/isaacs/node-graceful-fs/issues/4
+  // Chown should not fail on einval or eperm if non-root.
+  // It should not fail on enosys ever, as this just indicates
+  // that a fs doesn't support the intended operation.
+
+  fs.chown = chownFix(fs.chown)
+  fs.fchown = chownFix(fs.fchown)
+  fs.lchown = chownFix(fs.lchown)
+
+  fs.chmod = chmodFix(fs.chmod)
+  fs.fchmod = chmodFix(fs.fchmod)
+  fs.lchmod = chmodFix(fs.lchmod)
+
+  fs.chownSync = chownFixSync(fs.chownSync)
+  fs.fchownSync = chownFixSync(fs.fchownSync)
+  fs.lchownSync = chownFixSync(fs.lchownSync)
+
+  fs.chmodSync = chmodFixSync(fs.chmodSync)
+  fs.fchmodSync = chmodFixSync(fs.fchmodSync)
+  fs.lchmodSync = chmodFixSync(fs.lchmodSync)
+
+  fs.stat = statFix(fs.stat)
+  fs.fstat = statFix(fs.fstat)
+  fs.lstat = statFix(fs.lstat)
+
+  fs.statSync = statFixSync(fs.statSync)
+  fs.fstatSync = statFixSync(fs.fstatSync)
+  fs.lstatSync = statFixSync(fs.lstatSync)
+
+  // if lchmod/lchown do not exist, then make them no-ops
+  if (!fs.lchmod) {
+    fs.lchmod = function (path, mode, cb) {
+      if (cb) process.nextTick(cb)
+    }
+    fs.lchmodSync = function () {}
+  }
+  if (!fs.lchown) {
+    fs.lchown = function (path, uid, gid, cb) {
+      if (cb) process.nextTick(cb)
+    }
+    fs.lchownSync = function () {}
+  }
+
+  // on Windows, A/V software can lock the directory, causing this
+  // to fail with an EACCES or EPERM if the directory contains newly
+  // created files.  Try again on failure, for up to 60 seconds.
+
+  // Set the timeout this long because some Windows Anti-Virus, such as Parity
+  // bit9, may lock files for up to a minute, causing npm package install
+  // failures. Also, take care to yield the scheduler. Windows scheduling gives
+  // CPU to a busy looping process, which can cause the program causing the lock
+  // contention to be starved of CPU by node, so the contention doesn't resolve.
+  if (platform === "win32") {
+    fs.rename = (function (fs$rename) { return function (from, to, cb) {
+      var start = Date.now()
+      var backoff = 0;
+      fs$rename(from, to, function CB (er) {
+        if (er
+            && (er.code === "EACCES" || er.code === "EPERM")
+            && Date.now() - start < 60000) {
+          setTimeout(function() {
+            fs.stat(to, function (stater, st) {
+              if (stater && stater.code === "ENOENT")
+                fs$rename(from, to, CB);
+              else
+                cb(er)
+            })
+          }, backoff)
+          if (backoff < 100)
+            backoff += 10;
+          return;
+        }
+        if (cb) cb(er)
+      })
+    }})(fs.rename)
+  }
+
+  // if read() returns EAGAIN, then just try it again.
+  fs.read = (function (fs$read) {
+    function read (fd, buffer, offset, length, position, callback_) {
+      var callback
+      if (callback_ && typeof callback_ === 'function') {
+        var eagCounter = 0
+        callback = function (er, _, __) {
+          if (er && er.code === 'EAGAIN' && eagCounter < 10) {
+            eagCounter ++
+            return fs$read.call(fs, fd, buffer, offset, length, position, callback)
+          }
+          callback_.apply(this, arguments)
+        }
+      }
+      return fs$read.call(fs, fd, buffer, offset, length, position, callback)
+    }
+
+    // This ensures `util.promisify` works as it does for native `fs.read`.
+    read.__proto__ = fs$read
+    return read
+  })(fs.read)
+
+  fs.readSync = (function (fs$readSync) { return function (fd, buffer, offset, length, position) {
+    var eagCounter = 0
+    while (true) {
+      try {
+        return fs$readSync.call(fs, fd, buffer, offset, length, position)
+      } catch (er) {
+        if (er.code === 'EAGAIN' && eagCounter < 10) {
+          eagCounter ++
+          continue
+        }
+        throw er
+      }
+    }
+  }})(fs.readSync)
+
+  function patchLchmod (fs) {
+    fs.lchmod = function (path, mode, callback) {
+      fs.open( path
+             , constants.O_WRONLY | constants.O_SYMLINK
+             , mode
+             , function (err, fd) {
+        if (err) {
+          if (callback) callback(err)
+          return
+        }
+        // prefer to return the chmod error, if one occurs,
+        // but still try to close, and report closing errors if they occur.
+        fs.fchmod(fd, mode, function (err) {
+          fs.close(fd, function(err2) {
+            if (callback) callback(err || err2)
+          })
+        })
+      })
+    }
+
+    fs.lchmodSync = function (path, mode) {
+      var fd = fs.openSync(path, constants.O_WRONLY | constants.O_SYMLINK, mode)
+
+      // prefer to return the chmod error, if one occurs,
+      // but still try to close, and report closing errors if they occur.
+      var threw = true
+      var ret
+      try {
+        ret = fs.fchmodSync(fd, mode)
+        threw = false
+      } finally {
+        if (threw) {
+          try {
+            fs.closeSync(fd)
+          } catch (er) {}
+        } else {
+          fs.closeSync(fd)
+        }
+      }
+      return ret
+    }
+  }
+
+  function patchLutimes (fs) {
+    if (constants.hasOwnProperty("O_SYMLINK")) {
+      fs.lutimes = function (path, at, mt, cb) {
+        fs.open(path, constants.O_SYMLINK, function (er, fd) {
+          if (er) {
+            if (cb) cb(er)
+            return
+          }
+          fs.futimes(fd, at, mt, function (er) {
+            fs.close(fd, function (er2) {
+              if (cb) cb(er || er2)
+            })
+          })
+        })
+      }
+
+      fs.lutimesSync = function (path, at, mt) {
+        var fd = fs.openSync(path, constants.O_SYMLINK)
+        var ret
+        var threw = true
+        try {
+          ret = fs.futimesSync(fd, at, mt)
+          threw = false
+        } finally {
+          if (threw) {
+            try {
+              fs.closeSync(fd)
+            } catch (er) {}
+          } else {
+            fs.closeSync(fd)
+          }
+        }
+        return ret
+      }
+
+    } else {
+      fs.lutimes = function (_a, _b, _c, cb) { if (cb) process.nextTick(cb) }
+      fs.lutimesSync = function () {}
+    }
+  }
+
+  function chmodFix (orig) {
+    if (!orig) return orig
+    return function (target, mode, cb) {
+      return orig.call(fs, target, mode, function (er) {
+        if (chownErOk(er)) er = null
+        if (cb) cb.apply(this, arguments)
+      })
+    }
+  }
+
+  function chmodFixSync (orig) {
+    if (!orig) return orig
+    return function (target, mode) {
+      try {
+        return orig.call(fs, target, mode)
+      } catch (er) {
+        if (!chownErOk(er)) throw er
+      }
+    }
+  }
+
+
+  function chownFix (orig) {
+    if (!orig) return orig
+    return function (target, uid, gid, cb) {
+      return orig.call(fs, target, uid, gid, function (er) {
+        if (chownErOk(er)) er = null
+        if (cb) cb.apply(this, arguments)
+      })
+    }
+  }
+
+  function chownFixSync (orig) {
+    if (!orig) return orig
+    return function (target, uid, gid) {
+      try {
+        return orig.call(fs, target, uid, gid)
+      } catch (er) {
+        if (!chownErOk(er)) throw er
+      }
+    }
+  }
+
+  function statFix (orig) {
+    if (!orig) return orig
+    // Older versions of Node erroneously returned signed integers for
+    // uid + gid.
+    return function (target, options, cb) {
+      if (typeof options === 'function') {
+        cb = options
+        options = null
+      }
+      function callback (er, stats) {
+        if (stats) {
+          if (stats.uid < 0) stats.uid += 0x100000000
+          if (stats.gid < 0) stats.gid += 0x100000000
+        }
+        if (cb) cb.apply(this, arguments)
+      }
+      return options ? orig.call(fs, target, options, callback)
+        : orig.call(fs, target, callback)
+    }
+  }
+
+  function statFixSync (orig) {
+    if (!orig) return orig
+    // Older versions of Node erroneously returned signed integers for
+    // uid + gid.
+    return function (target, options) {
+      var stats = options ? orig.call(fs, target, options)
+        : orig.call(fs, target)
+      if (stats.uid < 0) stats.uid += 0x100000000
+      if (stats.gid < 0) stats.gid += 0x100000000
+      return stats;
+    }
+  }
+
+  // ENOSYS means that the fs doesn't support the op. Just ignore
+  // that, because it doesn't matter.
+  //
+  // if there's no getuid, or if getuid() is something other
+  // than 0, and the error is EINVAL or EPERM, then just ignore
+  // it.
+  //
+  // This specific case is a silent failure in cp, install, tar,
+  // and most other unix tools that manage permissions.
+  //
+  // When running as root, or if other types of errors are
+  // encountered, then it's strict.
+  function chownErOk (er) {
+    if (!er)
+      return true
+
+    if (er.code === "ENOSYS")
+      return true
+
+    var nonroot = !process.getuid || process.getuid() !== 0
+    if (nonroot) {
+      if (er.code === "EINVAL" || er.code === "EPERM")
+        return true
+    }
+
+    return false
+  }
+}
+
+
+/***/ }),
 /* 251 */,
 /* 252 */,
 /* 253 */,
@@ -6243,7 +7671,7 @@ module.exports = baseIsNative;
 /* 255 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var Stack = __webpack_require__(598),
+var Stack = __webpack_require__(214),
     baseIsEqual = __webpack_require__(190);
 
 /** Used to compose bitmasks for value comparisons. */
@@ -6838,7 +8266,7 @@ function parseOrigin(origin) {
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var identity = __webpack_require__(83),
-    overRest = __webpack_require__(588),
+    overRest = __webpack_require__(430),
     setToString = __webpack_require__(70);
 
 /**
@@ -6889,7 +8317,7 @@ var legacy = __webpack_require__(177)
 var invalid = __webpack_require__(793)
 var decimal = __webpack_require__(926)
 var hexadecimal = __webpack_require__(928)
-var alphanumerical = __webpack_require__(110)
+var alphanumerical = __webpack_require__(542)
 var decodeEntity = __webpack_require__(737)
 
 module.exports = parseEntities
@@ -9314,7 +10742,7 @@ exports.paginateRest = paginateRest;
 /* 301 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var isArrayLike = __webpack_require__(192),
+var isArrayLike = __webpack_require__(146),
     isObjectLike = __webpack_require__(337);
 
 /**
@@ -9355,67 +10783,43 @@ module.exports = isArrayLikeObject;
 /* 304 */
 /***/ (function(module) {
 
-"use strict";
+/** Used to detect hot functions by number of calls within a span of milliseconds. */
+var HOT_COUNT = 800,
+    HOT_SPAN = 16;
 
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeNow = Date.now;
 
-module.exports = block
+/**
+ * Creates a function that'll short out and invoke `identity` instead
+ * of `func` when it's called `HOT_COUNT` or more times in `HOT_SPAN`
+ * milliseconds.
+ *
+ * @private
+ * @param {Function} func The function to restrict.
+ * @returns {Function} Returns the new shortable function.
+ */
+function shortOut(func) {
+  var count = 0,
+      lastCalled = 0;
 
-var lineFeed = '\n'
+  return function() {
+    var stamp = nativeNow(),
+        remaining = HOT_SPAN - (stamp - lastCalled);
 
-var blank = lineFeed + lineFeed
-var triple = blank + lineFeed
-var comment = blank + '<!---->' + blank
-
-// Stringify a block node with block children (e.g., `root` or `blockquote`).
-// Knows about code following a list, or adjacent lists with similar bullets,
-// and places an extra line feed between them.
-function block(node) {
-  var self = this
-  var options = self.options
-  var fences = options.fences
-  var gap = options.commonmark ? comment : triple
-  var definitionGap = options.tightDefinitions ? lineFeed : blank
-  var values = []
-  var children = node.children
-  var length = children.length
-  var index = -1
-  var previous
-  var child
-
-  while (++index < length) {
-    previous = child
-    child = children[index]
-
-    if (previous) {
-      // A list preceding another list that are equally ordered, or a
-      // list preceding an indented code block, need a gap between them,
-      // so as not to see them as one list, or content of the list,
-      // respectively.
-      //
-      // In commonmark, only something that breaks both up can do that,
-      // so we opt for an empty, invisible comment.  In other flavours,
-      // two blank lines are fine.
-      if (
-        previous.type === 'list' &&
-        ((child.type === 'list' && previous.ordered === child.ordered) ||
-          (child.type === 'code' && !child.lang && !fences))
-      ) {
-        values.push(gap)
-      } else if (
-        previous.type === 'definition' &&
-        child.type === 'definition'
-      ) {
-        values.push(definitionGap)
-      } else {
-        values.push(blank)
+    lastCalled = stamp;
+    if (remaining > 0) {
+      if (++count >= HOT_COUNT) {
+        return arguments[0];
       }
+    } else {
+      count = 0;
     }
-
-    values.push(self.visit(child, node))
-  }
-
-  return values.join('')
+    return func.apply(undefined, arguments);
+  };
 }
+
+module.exports = shortOut;
 
 
 /***/ }),
@@ -9427,49 +10831,46 @@ function block(node) {
 /* 310 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var castPath = __webpack_require__(929),
-    isArguments = __webpack_require__(460),
-    isArray = __webpack_require__(143),
-    isIndex = __webpack_require__(160),
-    isLength = __webpack_require__(56),
-    toKey = __webpack_require__(503);
+"use strict";
 
-/**
- * Checks if `path` exists on `object`.
- *
- * @private
- * @param {Object} object The object to query.
- * @param {Array|string} path The path to check.
- * @param {Function} hasFunc The function to check properties.
- * @returns {boolean} Returns `true` if `path` exists, else `false`.
- */
-function hasPath(object, path, hasFunc) {
-  path = castPath(path, object);
 
-  var index = -1,
-      length = path.length,
-      result = false;
+var compact = __webpack_require__(218)
 
-  while (++index < length) {
-    var key = toKey(path[index]);
-    if (!(result = object != null && hasFunc(object, key))) {
-      break;
-    }
-    object = object[key];
-  }
-  if (result || ++index != length) {
-    return result;
-  }
-  length = object == null ? 0 : object.length;
-  return !!length && isLength(length) && isIndex(key, length) &&
-    (isArray(object) || isArguments(object));
+module.exports = compile
+
+// Stringify the given tree.
+function compile() {
+  return this.visit(compact(this.tree, this.options.commonmark))
 }
-
-module.exports = hasPath;
 
 
 /***/ }),
-/* 311 */,
+/* 311 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var arrayPush = __webpack_require__(883),
+    isArray = __webpack_require__(143);
+
+/**
+ * The base implementation of `getAllKeys` and `getAllKeysIn` which uses
+ * `keysFunc` and `symbolsFunc` to get the enumerable property names and
+ * symbols of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {Function} keysFunc The function to get the keys of `object`.
+ * @param {Function} symbolsFunc The function to get the symbols of `object`.
+ * @returns {Array} Returns the array of property names and symbols.
+ */
+function baseGetAllKeys(object, keysFunc, symbolsFunc) {
+  var result = keysFunc(object);
+  return isArray(object) ? result : arrayPush(result, symbolsFunc(object));
+}
+
+module.exports = baseGetAllKeys;
+
+
+/***/ }),
 /* 312 */,
 /* 313 */,
 /* 314 */,
@@ -9561,89 +10962,16 @@ module.exports = getNative;
 
 "use strict";
 
+const u = __webpack_require__(676).fromPromise
+const fs = __webpack_require__(869)
 
-var trim = __webpack_require__(860)
-var whitespace = __webpack_require__(578)
-var locate = __webpack_require__(350)
+function pathExists (path) {
+  return fs.access(path).then(() => true).catch(() => false)
+}
 
-module.exports = strong
-strong.locator = locate
-
-var backslash = '\\'
-var asterisk = '*'
-var underscore = '_'
-
-function strong(eat, value, silent) {
-  var self = this
-  var index = 0
-  var character = value.charAt(index)
-  var now
-  var pedantic
-  var marker
-  var queue
-  var subvalue
-  var length
-  var previous
-
-  if (
-    (character !== asterisk && character !== underscore) ||
-    value.charAt(++index) !== character
-  ) {
-    return
-  }
-
-  pedantic = self.options.pedantic
-  marker = character
-  subvalue = marker + marker
-  length = value.length
-  index++
-  queue = ''
-  character = ''
-
-  if (pedantic && whitespace(value.charAt(index))) {
-    return
-  }
-
-  while (index < length) {
-    previous = character
-    character = value.charAt(index)
-
-    if (
-      character === marker &&
-      value.charAt(index + 1) === marker &&
-      (!pedantic || !whitespace(previous))
-    ) {
-      character = value.charAt(index + 2)
-
-      if (character !== marker) {
-        if (!trim(queue)) {
-          return
-        }
-
-        /* istanbul ignore if - never used (yet) */
-        if (silent) {
-          return true
-        }
-
-        now = eat.now()
-        now.column += 2
-        now.offset += 2
-
-        return eat(subvalue + queue + subvalue)({
-          type: 'strong',
-          children: self.tokenizeInline(queue, now)
-        })
-      }
-    }
-
-    if (!pedantic && character === backslash) {
-      queue += character
-      character = value.charAt(++index)
-    }
-
-    queue += character
-    index++
-  }
+module.exports = {
+  pathExists: u(pathExists),
+  pathExistsSync: fs.existsSync
 }
 
 
@@ -9677,245 +11005,7 @@ isStream.transform = function (stream) {
 
 /***/ }),
 /* 324 */,
-/* 325 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-var whitespace = __webpack_require__(578)
-
-module.exports = table
-
-var tab = '\t'
-var lineFeed = '\n'
-var space = ' '
-var dash = '-'
-var colon = ':'
-var backslash = '\\'
-var verticalBar = '|'
-
-var minColumns = 1
-var minRows = 2
-
-var left = 'left'
-var center = 'center'
-var right = 'right'
-
-function table(eat, value, silent) {
-  var self = this
-  var index
-  var alignments
-  var alignment
-  var subvalue
-  var row
-  var length
-  var lines
-  var queue
-  var character
-  var hasDash
-  var align
-  var cell
-  var preamble
-  var now
-  var position
-  var lineCount
-  var line
-  var rows
-  var table
-  var lineIndex
-  var pipeIndex
-  var first
-
-  // Exit when not in gfm-mode.
-  if (!self.options.gfm) {
-    return
-  }
-
-  // Get the rows.
-  // Detecting tables soon is hard, so there are some checks for performance
-  // here, such as the minimum number of rows, and allowed characters in the
-  // alignment row.
-  index = 0
-  lineCount = 0
-  length = value.length + 1
-  lines = []
-
-  while (index < length) {
-    lineIndex = value.indexOf(lineFeed, index)
-    pipeIndex = value.indexOf(verticalBar, index + 1)
-
-    if (lineIndex === -1) {
-      lineIndex = value.length
-    }
-
-    if (pipeIndex === -1 || pipeIndex > lineIndex) {
-      if (lineCount < minRows) {
-        return
-      }
-
-      break
-    }
-
-    lines.push(value.slice(index, lineIndex))
-    lineCount++
-    index = lineIndex + 1
-  }
-
-  // Parse the alignment row.
-  subvalue = lines.join(lineFeed)
-  alignments = lines.splice(1, 1)[0] || []
-  index = 0
-  length = alignments.length
-  lineCount--
-  alignment = false
-  align = []
-
-  while (index < length) {
-    character = alignments.charAt(index)
-
-    if (character === verticalBar) {
-      hasDash = null
-
-      if (alignment === false) {
-        if (first === false) {
-          return
-        }
-      } else {
-        align.push(alignment)
-        alignment = false
-      }
-
-      first = false
-    } else if (character === dash) {
-      hasDash = true
-      alignment = alignment || null
-    } else if (character === colon) {
-      if (alignment === left) {
-        alignment = center
-      } else if (hasDash && alignment === null) {
-        alignment = right
-      } else {
-        alignment = left
-      }
-    } else if (!whitespace(character)) {
-      return
-    }
-
-    index++
-  }
-
-  if (alignment !== false) {
-    align.push(alignment)
-  }
-
-  // Exit when without enough columns.
-  if (align.length < minColumns) {
-    return
-  }
-
-  /* istanbul ignore if - never used (yet) */
-  if (silent) {
-    return true
-  }
-
-  // Parse the rows.
-  position = -1
-  rows = []
-
-  table = eat(subvalue).reset({type: 'table', align: align, children: rows})
-
-  while (++position < lineCount) {
-    line = lines[position]
-    row = {type: 'tableRow', children: []}
-
-    // Eat a newline character when this is not the first row.
-    if (position) {
-      eat(lineFeed)
-    }
-
-    // Eat the row.
-    eat(line).reset(row, table)
-
-    length = line.length + 1
-    index = 0
-    queue = ''
-    cell = ''
-    preamble = true
-
-    while (index < length) {
-      character = line.charAt(index)
-
-      if (character === tab || character === space) {
-        if (cell) {
-          queue += character
-        } else {
-          eat(character)
-        }
-
-        index++
-        continue
-      }
-
-      if (character === '' || character === verticalBar) {
-        if (preamble) {
-          eat(character)
-        } else {
-          if ((cell || character) && !preamble) {
-            subvalue = cell
-
-            if (queue.length > 1) {
-              if (character) {
-                subvalue += queue.slice(0, -1)
-                queue = queue.charAt(queue.length - 1)
-              } else {
-                subvalue += queue
-                queue = ''
-              }
-            }
-
-            now = eat.now()
-
-            eat(subvalue)(
-              {type: 'tableCell', children: self.tokenizeInline(cell, now)},
-              row
-            )
-          }
-
-          eat(queue + character)
-
-          queue = ''
-          cell = ''
-        }
-      } else {
-        if (queue) {
-          cell += queue
-          queue = ''
-        }
-
-        cell += character
-
-        if (character === backslash && index !== length - 2) {
-          cell += line.charAt(index + 1)
-          index++
-        }
-      }
-
-      preamble = false
-      index++
-    }
-
-    // Eat the alignment row.
-    if (!position) {
-      eat(lineFeed + alignments)
-    }
-  }
-
-  return table
-}
-
-
-/***/ }),
+/* 325 */,
 /* 326 */,
 /* 327 */,
 /* 328 */,
@@ -9928,7 +11018,7 @@ function table(eat, value, silent) {
 
 
 var copy = __webpack_require__(259)
-var label = __webpack_require__(82)
+var label = __webpack_require__(616)
 
 module.exports = linkReference
 
@@ -10140,7 +11230,7 @@ function alphabetical(character) {
 /* 342 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseGet = __webpack_require__(356);
+var baseGet = __webpack_require__(745);
 
 /**
  * Gets the value at `path` of `object`. If the resolved value is
@@ -10498,7 +11588,7 @@ function locate(value, fromIndex) {
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var isPrototype = __webpack_require__(514),
-    nativeKeys = __webpack_require__(773);
+    nativeKeys = __webpack_require__(857);
 
 /** Used for built-in method references. */
 var objectProto = Object.prototype;
@@ -10533,63 +11623,194 @@ module.exports = baseKeys;
 /* 352 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseGet = __webpack_require__(356);
+"use strict";
 
-/**
- * A specialized version of `baseProperty` which supports deep paths.
- *
- * @private
- * @param {Array|string} path The path of the property to get.
- * @returns {Function} Returns the new accessor function.
- */
-function basePropertyDeep(path) {
-  return function(object) {
-    return baseGet(object, path);
-  };
+
+var path = __webpack_require__(622)
+var replace = __webpack_require__(730)
+var buffer = __webpack_require__(870)
+
+module.exports = VFile
+
+var own = {}.hasOwnProperty
+var proto = VFile.prototype
+
+// Order of setting (least specific to most), we need this because otherwise
+// `{stem: 'a', path: '~/b.js'}` would throw, as a path is needed before a
+// stem can be set.
+var order = ['history', 'path', 'basename', 'stem', 'extname', 'dirname']
+
+proto.toString = toString
+
+// Access full path (`~/index.min.js`).
+Object.defineProperty(proto, 'path', {get: getPath, set: setPath})
+
+// Access parent path (`~`).
+Object.defineProperty(proto, 'dirname', {get: getDirname, set: setDirname})
+
+// Access basename (`index.min.js`).
+Object.defineProperty(proto, 'basename', {get: getBasename, set: setBasename})
+
+// Access extname (`.js`).
+Object.defineProperty(proto, 'extname', {get: getExtname, set: setExtname})
+
+// Access stem (`index.min`).
+Object.defineProperty(proto, 'stem', {get: getStem, set: setStem})
+
+// Construct a new file.
+function VFile(options) {
+  var prop
+  var index
+  var length
+
+  if (!options) {
+    options = {}
+  } else if (typeof options === 'string' || buffer(options)) {
+    options = {contents: options}
+  } else if ('message' in options && 'messages' in options) {
+    return options
+  }
+
+  if (!(this instanceof VFile)) {
+    return new VFile(options)
+  }
+
+  this.data = {}
+  this.messages = []
+  this.history = []
+  this.cwd = process.cwd()
+
+  // Set path related properties in the correct order.
+  index = -1
+  length = order.length
+
+  while (++index < length) {
+    prop = order[index]
+
+    if (own.call(options, prop)) {
+      this[prop] = options[prop]
+    }
+  }
+
+  // Set non-path related properties.
+  for (prop in options) {
+    if (order.indexOf(prop) === -1) {
+      this[prop] = options[prop]
+    }
+  }
 }
 
-module.exports = basePropertyDeep;
+function getPath() {
+  return this.history[this.history.length - 1]
+}
+
+function setPath(path) {
+  assertNonEmpty(path, 'path')
+
+  if (path !== this.path) {
+    this.history.push(path)
+  }
+}
+
+function getDirname() {
+  return typeof this.path === 'string' ? path.dirname(this.path) : undefined
+}
+
+function setDirname(dirname) {
+  assertPath(this.path, 'dirname')
+  this.path = path.join(dirname || '', this.basename)
+}
+
+function getBasename() {
+  return typeof this.path === 'string' ? path.basename(this.path) : undefined
+}
+
+function setBasename(basename) {
+  assertNonEmpty(basename, 'basename')
+  assertPart(basename, 'basename')
+  this.path = path.join(this.dirname || '', basename)
+}
+
+function getExtname() {
+  return typeof this.path === 'string' ? path.extname(this.path) : undefined
+}
+
+function setExtname(extname) {
+  var ext = extname || ''
+
+  assertPart(ext, 'extname')
+  assertPath(this.path, 'extname')
+
+  if (ext) {
+    if (ext.charAt(0) !== '.') {
+      throw new Error('`extname` must start with `.`')
+    }
+
+    if (ext.indexOf('.', 1) !== -1) {
+      throw new Error('`extname` cannot contain multiple dots')
+    }
+  }
+
+  this.path = replace(this.path, ext)
+}
+
+function getStem() {
+  return typeof this.path === 'string'
+    ? path.basename(this.path, this.extname)
+    : undefined
+}
+
+function setStem(stem) {
+  assertNonEmpty(stem, 'stem')
+  assertPart(stem, 'stem')
+  this.path = path.join(this.dirname || '', stem + (this.extname || ''))
+}
+
+// Get the value of the file.
+function toString(encoding) {
+  var value = this.contents || ''
+  return buffer(value) ? value.toString(encoding) : String(value)
+}
+
+// Assert that `part` is not a path (i.e., does not contain `path.sep`).
+function assertPart(part, name) {
+  if (part.indexOf(path.sep) !== -1) {
+    throw new Error(
+      '`' + name + '` cannot be a path: did not expect `' + path.sep + '`'
+    )
+  }
+}
+
+// Assert that `part` is not empty.
+function assertNonEmpty(part, name) {
+  if (!part) {
+    throw new Error('`' + name + '` cannot be empty')
+  }
+}
+
+// Assert `path` exists.
+function assertPath(path, name) {
+  if (!path) {
+    throw new Error('Setting `' + name + '` requires `path` to be set too')
+  }
+}
 
 
 /***/ }),
-/* 353 */,
-/* 354 */
+/* 353 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseMatches = __webpack_require__(974),
-    baseMatchesProperty = __webpack_require__(728),
-    identity = __webpack_require__(83),
-    isArray = __webpack_require__(143),
-    property = __webpack_require__(927);
+"use strict";
 
-/**
- * The base implementation of `_.iteratee`.
- *
- * @private
- * @param {*} [value=_.identity] The value to convert to an iteratee.
- * @returns {Function} Returns the iteratee.
- */
-function baseIteratee(value) {
-  // Don't store the `typeof` result in a variable to avoid a JIT bug in Safari 9.
-  // See https://bugs.webkit.org/show_bug.cgi?id=156034 for more details.
-  if (typeof value == 'function') {
-    return value;
-  }
-  if (value == null) {
-    return identity;
-  }
-  if (typeof value == 'object') {
-    return isArray(value)
-      ? baseMatchesProperty(value[0], value[1])
-      : baseMatches(value);
-  }
-  return property(value);
+
+const u = __webpack_require__(676).fromCallback
+module.exports = {
+  move: u(__webpack_require__(500))
 }
-
-module.exports = baseIteratee;
 
 
 /***/ }),
+/* 354 */,
 /* 355 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -10673,32 +11894,23 @@ function listItem(node, parent, position, bullet) {
 
 /***/ }),
 /* 356 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var castPath = __webpack_require__(929),
-    toKey = __webpack_require__(503);
+function stringify (obj, options = {}) {
+  const EOL = options.EOL || '\n'
 
-/**
- * The base implementation of `_.get` without support for default values.
- *
- * @private
- * @param {Object} object The object to query.
- * @param {Array|string} path The path of the property to get.
- * @returns {*} Returns the resolved value.
- */
-function baseGet(object, path) {
-  path = castPath(path, object);
+  const str = JSON.stringify(obj, options ? options.replacer : null, options.spaces)
 
-  var index = 0,
-      length = path.length;
-
-  while (object != null && index < length) {
-    object = object[toKey(path[index++])];
-  }
-  return (index && index == length) ? object : undefined;
+  return str.replace(/\n/g, EOL) + EOL
 }
 
-module.exports = baseGet;
+function stripBom (content) {
+  // we do this because JSON.parse would convert it to a utf8 string if encoding wasn't specified
+  if (Buffer.isBuffer(content)) content = content.toString('utf8')
+  return content.replace(/^\uFEFF/, '')
+}
+
+module.exports = { stringify, stripBom }
 
 
 /***/ }),
@@ -10711,42 +11923,33 @@ module.exports = require("assert");
 /* 358 */,
 /* 359 */,
 /* 360 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var baseHasIn = __webpack_require__(754),
-    hasPath = __webpack_require__(310);
+"use strict";
 
-/**
- * Checks if `path` is a direct or inherited property of `object`.
- *
- * @static
- * @memberOf _
- * @since 4.0.0
- * @category Object
- * @param {Object} object The object to query.
- * @param {Array|string} path The path to check.
- * @returns {boolean} Returns `true` if `path` exists, else `false`.
- * @example
- *
- * var object = _.create({ 'a': _.create({ 'b': 2 }) });
- *
- * _.hasIn(object, 'a');
- * // => true
- *
- * _.hasIn(object, 'a.b');
- * // => true
- *
- * _.hasIn(object, ['a', 'b']);
- * // => true
- *
- * _.hasIn(object, 'b');
- * // => false
- */
-function hasIn(object, path) {
-  return object != null && hasPath(object, path, baseHasIn);
+
+module.exports = unorderedItems
+
+var lineFeed = '\n'
+
+var blank = lineFeed + lineFeed
+
+// Visit unordered list items.  Uses `options.bullet` as each item’s bullet.
+function unorderedItems(node) {
+  var self = this
+  var bullet = self.options.bullet
+  var fn = self.visitors.listItem
+  var children = node.children
+  var length = children.length
+  var index = -1
+  var values = []
+
+  while (++index < length) {
+    values[index] = fn.call(self, children[index], node, index, bullet)
+  }
+
+  return values.join(node.spread ? blank : lineFeed)
 }
-
-module.exports = hasIn;
 
 
 /***/ }),
@@ -10806,86 +12009,96 @@ function locate(value, fromIndex) {
 /* 368 */,
 /* 369 */,
 /* 370 */,
-/* 371 */
+/* 371 */,
+/* 372 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
 
-var xtend = __webpack_require__(940)
-var removePosition = __webpack_require__(965)
+var trim = __webpack_require__(860)
+var whitespace = __webpack_require__(578)
+var locate = __webpack_require__(350)
 
-module.exports = parse
+module.exports = strong
+strong.locator = locate
 
-var lineFeed = '\n'
-var lineBreaksExpression = /\r\n|\r/g
+var backslash = '\\'
+var asterisk = '*'
+var underscore = '_'
 
-// Parse the bound file.
-function parse() {
+function strong(eat, value, silent) {
   var self = this
-  var value = String(self.file)
-  var start = {line: 1, column: 1, offset: 0}
-  var content = xtend(start)
-  var node
+  var index = 0
+  var character = value.charAt(index)
+  var now
+  var pedantic
+  var marker
+  var queue
+  var subvalue
+  var length
+  var previous
 
-  // Clean non-unix newlines: `\r\n` and `\r` are all changed to `\n`.
-  // This should not affect positional information.
-  value = value.replace(lineBreaksExpression, lineFeed)
-
-  // BOM.
-  if (value.charCodeAt(0) === 0xfeff) {
-    value = value.slice(1)
-
-    content.column++
-    content.offset++
+  if (
+    (character !== asterisk && character !== underscore) ||
+    value.charAt(++index) !== character
+  ) {
+    return
   }
 
-  node = {
-    type: 'root',
-    children: self.tokenizeBlock(value, content),
-    position: {start: start, end: self.eof || xtend(start)}
+  pedantic = self.options.pedantic
+  marker = character
+  subvalue = marker + marker
+  length = value.length
+  index++
+  queue = ''
+  character = ''
+
+  if (pedantic && whitespace(value.charAt(index))) {
+    return
   }
 
-  if (!self.options.position) {
-    removePosition(node, true)
-  }
+  while (index < length) {
+    previous = character
+    character = value.charAt(index)
 
-  return node
+    if (
+      character === marker &&
+      value.charAt(index + 1) === marker &&
+      (!pedantic || !whitespace(previous))
+    ) {
+      character = value.charAt(index + 2)
+
+      if (character !== marker) {
+        if (!trim(queue)) {
+          return
+        }
+
+        /* istanbul ignore if - never used (yet) */
+        if (silent) {
+          return true
+        }
+
+        now = eat.now()
+        now.column += 2
+        now.offset += 2
+
+        return eat(subvalue + queue + subvalue)({
+          type: 'strong',
+          children: self.tokenizeInline(queue, now)
+        })
+      }
+    }
+
+    if (!pedantic && character === backslash) {
+      queue += character
+      character = value.charAt(++index)
+    }
+
+    queue += character
+    index++
+  }
 }
-
-
-/***/ }),
-/* 372 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var getTag = __webpack_require__(700),
-    isObjectLike = __webpack_require__(337);
-
-/** `Object#toString` result references. */
-var weakMapTag = '[object WeakMap]';
-
-/**
- * Checks if `value` is classified as a `WeakMap` object.
- *
- * @static
- * @memberOf _
- * @since 4.3.0
- * @category Lang
- * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if `value` is a weak map, else `false`.
- * @example
- *
- * _.isWeakMap(new WeakMap);
- * // => true
- *
- * _.isWeakMap(new Map);
- * // => false
- */
-function isWeakMap(value) {
-  return isObjectLike(value) && getTag(value) == weakMapTag;
-}
-
-module.exports = isWeakMap;
 
 
 /***/ }),
@@ -11019,23 +12232,23 @@ module.exports = function extend() {
 /* 377 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var Stack = __webpack_require__(598),
+var Stack = __webpack_require__(214),
     arrayEach = __webpack_require__(698),
     assignValue = __webpack_require__(691),
     baseAssign = __webpack_require__(629),
     baseAssignIn = __webpack_require__(610),
     cloneBuffer = __webpack_require__(744),
     copyArray = __webpack_require__(239),
-    copySymbols = __webpack_require__(760),
+    copySymbols = __webpack_require__(645),
     copySymbolsIn = __webpack_require__(589),
     getAllKeys = __webpack_require__(706),
     getAllKeysIn = __webpack_require__(590),
     getTag = __webpack_require__(700),
-    initCloneArray = __webpack_require__(430),
+    initCloneArray = __webpack_require__(97),
     initCloneByTag = __webpack_require__(538),
     initCloneObject = __webpack_require__(66),
     isArray = __webpack_require__(143),
-    isBuffer = __webpack_require__(408),
+    isBuffer = __webpack_require__(150),
     isMap = __webpack_require__(401),
     isObject = __webpack_require__(988),
     isSet = __webpack_require__(713),
@@ -11189,7 +12402,26 @@ module.exports = baseClone;
 /***/ }),
 /* 378 */,
 /* 379 */,
-/* 380 */,
+/* 380 */
+/***/ (function(module) {
+
+/**
+ * Gets the stack value for `key`.
+ *
+ * @private
+ * @name get
+ * @memberOf Stack
+ * @param {string} key The key of the value to get.
+ * @returns {*} Returns the entry value.
+ */
+function stackGet(key) {
+  return this.__data__.get(key);
+}
+
+module.exports = stackGet;
+
+
+/***/ }),
 /* 381 */,
 /* 382 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -11213,9 +12445,9 @@ module.exports = defineProperty;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var LazyWrapper = __webpack_require__(37),
-    getData = __webpack_require__(418),
+    getData = __webpack_require__(680),
     getFuncName = __webpack_require__(202),
-    lodash = __webpack_require__(751);
+    lodash = __webpack_require__(847);
 
 /**
  * Checks if `func` has a lazy counterpart.
@@ -11663,63 +12895,140 @@ module.exports = getSymbolsIn;
 /* 387 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var createWrap = __webpack_require__(227);
+"use strict";
 
-/** Used to compose bitmasks for function metadata. */
-var WRAP_CURRY_FLAG = 8;
 
-/**
- * Creates a function that accepts arguments of `func` and either invokes
- * `func` returning its result, if at least `arity` number of arguments have
- * been provided, or returns a function that accepts the remaining `func`
- * arguments, and so on. The arity of `func` may be specified if `func.length`
- * is not sufficient.
- *
- * The `_.curry.placeholder` value, which defaults to `_` in monolithic builds,
- * may be used as a placeholder for provided arguments.
- *
- * **Note:** This method doesn't set the "length" property of curried functions.
- *
- * @static
- * @memberOf _
- * @since 2.0.0
- * @category Function
- * @param {Function} func The function to curry.
- * @param {number} [arity=func.length] The arity of `func`.
- * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
- * @returns {Function} Returns the new curried function.
- * @example
- *
- * var abc = function(a, b, c) {
- *   return [a, b, c];
- * };
- *
- * var curried = _.curry(abc);
- *
- * curried(1)(2)(3);
- * // => [1, 2, 3]
- *
- * curried(1, 2)(3);
- * // => [1, 2, 3]
- *
- * curried(1, 2, 3);
- * // => [1, 2, 3]
- *
- * // Curried with placeholders.
- * curried(1)(_, 3)(2);
- * // => [1, 2, 3]
- */
-function curry(func, arity, guard) {
-  arity = guard ? undefined : arity;
-  var result = createWrap(func, WRAP_CURRY_FLAG, undefined, undefined, undefined, undefined, undefined, arity);
-  result.placeholder = curry.placeholder;
-  return result;
+var whitespace = __webpack_require__(578)
+var decode = __webpack_require__(277)
+var locate = __webpack_require__(725)
+
+module.exports = autoLink
+autoLink.locator = locate
+autoLink.notInLink = true
+
+var lessThan = '<'
+var greaterThan = '>'
+var atSign = '@'
+var slash = '/'
+var mailto = 'mailto:'
+var mailtoLength = mailto.length
+
+function autoLink(eat, value, silent) {
+  var self = this
+  var subvalue = ''
+  var length = value.length
+  var index = 0
+  var queue = ''
+  var hasAtCharacter = false
+  var link = ''
+  var character
+  var now
+  var content
+  var tokenizers
+  var exit
+
+  if (value.charAt(0) !== lessThan) {
+    return
+  }
+
+  index++
+  subvalue = lessThan
+
+  while (index < length) {
+    character = value.charAt(index)
+
+    if (
+      whitespace(character) ||
+      character === greaterThan ||
+      character === atSign ||
+      (character === ':' && value.charAt(index + 1) === slash)
+    ) {
+      break
+    }
+
+    queue += character
+    index++
+  }
+
+  if (!queue) {
+    return
+  }
+
+  link += queue
+  queue = ''
+
+  character = value.charAt(index)
+  link += character
+  index++
+
+  if (character === atSign) {
+    hasAtCharacter = true
+  } else {
+    if (character !== ':' || value.charAt(index + 1) !== slash) {
+      return
+    }
+
+    link += slash
+    index++
+  }
+
+  while (index < length) {
+    character = value.charAt(index)
+
+    if (whitespace(character) || character === greaterThan) {
+      break
+    }
+
+    queue += character
+    index++
+  }
+
+  character = value.charAt(index)
+
+  if (!queue || character !== greaterThan) {
+    return
+  }
+
+  /* istanbul ignore if - never used (yet) */
+  if (silent) {
+    return true
+  }
+
+  link += queue
+  content = link
+  subvalue += link + character
+  now = eat.now()
+  now.column++
+  now.offset++
+
+  if (hasAtCharacter) {
+    if (link.slice(0, mailtoLength).toLowerCase() === mailto) {
+      content = content.slice(mailtoLength)
+      now.column += mailtoLength
+      now.offset += mailtoLength
+    } else {
+      link = mailto + link
+    }
+  }
+
+  // Temporarily remove all tokenizers except text in autolinks.
+  tokenizers = self.inlineTokenizers
+  self.inlineTokenizers = {text: tokenizers.text}
+
+  exit = self.enterLink()
+
+  content = self.tokenizeInline(content, now)
+
+  self.inlineTokenizers = tokenizers
+  exit()
+
+  return eat(subvalue)({
+    type: 'link',
+    title: null,
+    url: decode(link, {nonTerminated: false}),
+    children: content
+  })
 }
-
-// Assign default placeholders.
-curry.placeholder = {};
-
-module.exports = curry;
 
 
 /***/ }),
@@ -11763,7 +13072,79 @@ module.exports = readShebang;
 
 
 /***/ }),
-/* 390 */,
+/* 390 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var SetCache = __webpack_require__(405),
+    arrayIncludes = __webpack_require__(751),
+    arrayIncludesWith = __webpack_require__(655),
+    arrayMap = __webpack_require__(766),
+    baseUnary = __webpack_require__(231),
+    cacheHas = __webpack_require__(275);
+
+/** Used as the size to enable large array optimizations. */
+var LARGE_ARRAY_SIZE = 200;
+
+/**
+ * The base implementation of methods like `_.difference` without support
+ * for excluding multiple arrays or iteratee shorthands.
+ *
+ * @private
+ * @param {Array} array The array to inspect.
+ * @param {Array} values The values to exclude.
+ * @param {Function} [iteratee] The iteratee invoked per element.
+ * @param {Function} [comparator] The comparator invoked per element.
+ * @returns {Array} Returns the new array of filtered values.
+ */
+function baseDifference(array, values, iteratee, comparator) {
+  var index = -1,
+      includes = arrayIncludes,
+      isCommon = true,
+      length = array.length,
+      result = [],
+      valuesLength = values.length;
+
+  if (!length) {
+    return result;
+  }
+  if (iteratee) {
+    values = arrayMap(values, baseUnary(iteratee));
+  }
+  if (comparator) {
+    includes = arrayIncludesWith;
+    isCommon = false;
+  }
+  else if (values.length >= LARGE_ARRAY_SIZE) {
+    includes = cacheHas;
+    isCommon = false;
+    values = new SetCache(values);
+  }
+  outer:
+  while (++index < length) {
+    var value = array[index],
+        computed = iteratee == null ? value : iteratee(value);
+
+    value = (comparator || value !== 0) ? value : 0;
+    if (isCommon && computed === computed) {
+      var valuesIndex = valuesLength;
+      while (valuesIndex--) {
+        if (values[valuesIndex] === computed) {
+          continue outer;
+        }
+      }
+      result.push(value);
+    }
+    else if (!includes(values, computed, comparator)) {
+      result.push(value);
+    }
+  }
+  return result;
+}
+
+module.exports = baseDifference;
+
+
+/***/ }),
 /* 391 */,
 /* 392 */,
 /* 393 */
@@ -11794,7 +13175,7 @@ module.exports = overArg;
 
 
 var decimal = __webpack_require__(926)
-var alphanumeric = __webpack_require__(584)
+var alphanumeric = __webpack_require__(773)
 var whitespace = __webpack_require__(578)
 var escapes = __webpack_require__(215)
 var prefix = __webpack_require__(797)
@@ -12106,14 +13487,53 @@ module.exports = coreJsData;
 /***/ }),
 /* 397 */,
 /* 398 */,
-/* 399 */,
+/* 399 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseHasIn = __webpack_require__(754),
+    hasPath = __webpack_require__(800);
+
+/**
+ * Checks if `path` is a direct or inherited property of `object`.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Object
+ * @param {Object} object The object to query.
+ * @param {Array|string} path The path to check.
+ * @returns {boolean} Returns `true` if `path` exists, else `false`.
+ * @example
+ *
+ * var object = _.create({ 'a': _.create({ 'b': 2 }) });
+ *
+ * _.hasIn(object, 'a');
+ * // => true
+ *
+ * _.hasIn(object, 'a.b');
+ * // => true
+ *
+ * _.hasIn(object, ['a', 'b']);
+ * // => true
+ *
+ * _.hasIn(object, 'b');
+ * // => false
+ */
+function hasIn(object, path) {
+  return object != null && hasPath(object, path, baseHasIn);
+}
+
+module.exports = hasIn;
+
+
+/***/ }),
 /* 400 */,
 /* 401 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var baseIsMap = __webpack_require__(229),
     baseUnary = __webpack_require__(231),
-    nodeUtil = __webpack_require__(616);
+    nodeUtil = __webpack_require__(138);
 
 /* Node.js helper references. */
 var nodeIsMap = nodeUtil && nodeUtil.isMap;
@@ -12180,82 +13600,50 @@ module.exports = SetCache;
 /* 406 */,
 /* 407 */,
 /* 408 */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/* module decorator */ module = __webpack_require__.nmd(module);
-var root = __webpack_require__(824),
-    stubFalse = __webpack_require__(451);
-
-/** Detect free variable `exports`. */
-var freeExports =  true && exports && !exports.nodeType && exports;
-
-/** Detect free variable `module`. */
-var freeModule = freeExports && "object" == 'object' && module && !module.nodeType && module;
-
-/** Detect the popular CommonJS extension `module.exports`. */
-var moduleExports = freeModule && freeModule.exports === freeExports;
+var Symbol = __webpack_require__(498),
+    isArguments = __webpack_require__(460),
+    isArray = __webpack_require__(143);
 
 /** Built-in value references. */
-var Buffer = moduleExports ? root.Buffer : undefined;
-
-/* Built-in method references for those with the same name as other `lodash` methods. */
-var nativeIsBuffer = Buffer ? Buffer.isBuffer : undefined;
+var spreadableSymbol = Symbol ? Symbol.isConcatSpreadable : undefined;
 
 /**
- * Checks if `value` is a buffer.
+ * Checks if `value` is a flattenable `arguments` object or array.
  *
- * @static
- * @memberOf _
- * @since 4.3.0
- * @category Lang
+ * @private
  * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if `value` is a buffer, else `false`.
- * @example
- *
- * _.isBuffer(new Buffer(2));
- * // => true
- *
- * _.isBuffer(new Uint8Array(2));
- * // => false
+ * @returns {boolean} Returns `true` if `value` is flattenable, else `false`.
  */
-var isBuffer = nativeIsBuffer || stubFalse;
+function isFlattenable(value) {
+  return isArray(value) || isArguments(value) ||
+    !!(spreadableSymbol && value && value[spreadableSymbol]);
+}
 
-module.exports = isBuffer;
+module.exports = isFlattenable;
 
 
 /***/ }),
 /* 409 */,
-/* 410 */,
-/* 411 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/* 410 */
+/***/ (function(__unusedmodule, exports) {
 
 "use strict";
 
-
-var repeat = __webpack_require__(8)
-
-module.exports = strong
-
-// Stringify a `strong`.
-//
-// The marker used is configurable by `strong`, which defaults to an asterisk
-// (`'*'`) but also accepts an underscore (`'_'`):
-//
-// ```markdown
-// __foo__
-// ```
-function strong(node) {
-  var marker = repeat(this.options.strong, 2)
-  return marker + this.all(node).join('') + marker
-}
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.replaceRange = (str, start, end, replacement) => {
+    return str.substring(0, start) + replacement + str.substring(end);
+};
 
 
 /***/ }),
+/* 411 */,
 /* 412 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var baseGetTag = __webpack_require__(51),
-    isLength = __webpack_require__(56),
+    isLength = __webpack_require__(611),
     isObjectLike = __webpack_require__(337);
 
 /** `Object#toString` result references. */
@@ -12324,7 +13712,29 @@ module.exports = __webpack_require__(141);
 
 
 /***/ }),
-/* 414 */,
+/* 414 */
+/***/ (function(module) {
+
+/** Used to match wrap detail comments. */
+var reWrapDetails = /\{\n\/\* \[wrapped with (.+)\] \*/,
+    reSplitDetails = /,? & /;
+
+/**
+ * Extracts wrapper details from the `source` body comment.
+ *
+ * @private
+ * @param {string} source The source to inspect.
+ * @returns {Array} Returns the wrapper details.
+ */
+function getWrapDetails(source) {
+  var match = source.match(reWrapDetails);
+  return match ? match[1].split(reSplitDetails) : [];
+}
+
+module.exports = getWrapDetails;
+
+
+/***/ }),
 /* 415 */,
 /* 416 */
 /***/ (function(module) {
@@ -12356,21 +13766,105 @@ module.exports = matchesStrictComparable;
 /* 418 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var metaMap = __webpack_require__(156),
-    noop = __webpack_require__(611);
+"use strict";
 
-/**
- * Gets metadata for `func`.
- *
- * @private
- * @param {Function} func The function to query.
- * @returns {*} Returns the metadata for `func`.
- */
-var getData = !metaMap ? noop : function(func) {
-  return metaMap.get(func);
-};
 
-module.exports = getData;
+var repeat = __webpack_require__(8)
+var trim = __webpack_require__(932)
+
+module.exports = indentedCode
+
+var lineFeed = '\n'
+var tab = '\t'
+var space = ' '
+
+var tabSize = 4
+var codeIndent = repeat(space, tabSize)
+
+function indentedCode(eat, value, silent) {
+  var index = -1
+  var length = value.length
+  var subvalue = ''
+  var content = ''
+  var subvalueQueue = ''
+  var contentQueue = ''
+  var character
+  var blankQueue
+  var indent
+
+  while (++index < length) {
+    character = value.charAt(index)
+
+    if (indent) {
+      indent = false
+
+      subvalue += subvalueQueue
+      content += contentQueue
+      subvalueQueue = ''
+      contentQueue = ''
+
+      if (character === lineFeed) {
+        subvalueQueue = character
+        contentQueue = character
+      } else {
+        subvalue += character
+        content += character
+
+        while (++index < length) {
+          character = value.charAt(index)
+
+          if (!character || character === lineFeed) {
+            contentQueue = character
+            subvalueQueue = character
+            break
+          }
+
+          subvalue += character
+          content += character
+        }
+      }
+    } else if (
+      character === space &&
+      value.charAt(index + 1) === character &&
+      value.charAt(index + 2) === character &&
+      value.charAt(index + 3) === character
+    ) {
+      subvalueQueue += codeIndent
+      index += 3
+      indent = true
+    } else if (character === tab) {
+      subvalueQueue += character
+      indent = true
+    } else {
+      blankQueue = ''
+
+      while (character === tab || character === space) {
+        blankQueue += character
+        character = value.charAt(++index)
+      }
+
+      if (character !== lineFeed) {
+        break
+      }
+
+      subvalueQueue += blankQueue + character
+      contentQueue += character
+    }
+  }
+
+  if (content) {
+    if (silent) {
+      return true
+    }
+
+    return eat(subvalue)({
+      type: 'code',
+      lang: null,
+      meta: null,
+      value: trim(content)
+    })
+  }
+}
 
 
 /***/ }),
@@ -12398,63 +13892,142 @@ module.exports = Set;
 "use strict";
 
 
-var xtend = __webpack_require__(940)
-var toggle = __webpack_require__(4)
+const fs = __webpack_require__(869)
+const path = __webpack_require__(622)
+const util = __webpack_require__(669)
+const atLeastNode = __webpack_require__(159)
 
-module.exports = Compiler
+const nodeSupportsBigInt = atLeastNode('10.5.0')
+const stat = (file) => nodeSupportsBigInt ? fs.stat(file, { bigint: true }) : fs.stat(file)
+const statSync = (file) => nodeSupportsBigInt ? fs.statSync(file, { bigint: true }) : fs.statSync(file)
 
-// Construct a new compiler.
-function Compiler(tree, file) {
-  this.inLink = false
-  this.inTable = false
-  this.tree = tree
-  this.file = file
-  this.options = xtend(this.options)
-  this.setOptions({})
+function getStats (src, dest) {
+  return Promise.all([
+    stat(src),
+    stat(dest).catch(err => {
+      if (err.code === 'ENOENT') return null
+      throw err
+    })
+  ]).then(([srcStat, destStat]) => ({ srcStat, destStat }))
 }
 
-var proto = Compiler.prototype
+function getStatsSync (src, dest) {
+  let destStat
+  const srcStat = statSync(src)
+  try {
+    destStat = statSync(dest)
+  } catch (err) {
+    if (err.code === 'ENOENT') return { srcStat, destStat: null }
+    throw err
+  }
+  return { srcStat, destStat }
+}
 
-// Enter and exit helpers. */
-proto.enterLink = toggle('inLink', false)
-proto.enterTable = toggle('inTable', false)
-proto.enterLinkReference = __webpack_require__(172)
+function checkPaths (src, dest, funcName, cb) {
+  util.callbackify(getStats)(src, dest, (err, stats) => {
+    if (err) return cb(err)
+    const { srcStat, destStat } = stats
+    if (destStat && areIdentical(srcStat, destStat)) {
+      return cb(new Error('Source and destination must not be the same.'))
+    }
+    if (srcStat.isDirectory() && isSrcSubdir(src, dest)) {
+      return cb(new Error(errMsg(src, dest, funcName)))
+    }
+    return cb(null, { srcStat, destStat })
+  })
+}
 
-// Configuration.
-proto.options = __webpack_require__(555)
-proto.setOptions = __webpack_require__(279)
+function checkPathsSync (src, dest, funcName) {
+  const { srcStat, destStat } = getStatsSync(src, dest)
+  if (destStat && areIdentical(srcStat, destStat)) {
+    throw new Error('Source and destination must not be the same.')
+  }
+  if (srcStat.isDirectory() && isSrcSubdir(src, dest)) {
+    throw new Error(errMsg(src, dest, funcName))
+  }
+  return { srcStat, destStat }
+}
 
-proto.compile = __webpack_require__(54)
-proto.visit = __webpack_require__(690)
-proto.all = __webpack_require__(203)
-proto.block = __webpack_require__(304)
-proto.visitOrderedItems = __webpack_require__(594)
-proto.visitUnorderedItems = __webpack_require__(668)
+// recursively check if dest parent is a subdirectory of src.
+// It works for all file types including symlinks since it
+// checks the src and dest inodes. It starts from the deepest
+// parent and stops once it reaches the src parent or the root path.
+function checkParentPaths (src, srcStat, dest, funcName, cb) {
+  const srcParent = path.resolve(path.dirname(src))
+  const destParent = path.resolve(path.dirname(dest))
+  if (destParent === srcParent || destParent === path.parse(destParent).root) return cb()
+  const callback = (err, destStat) => {
+    if (err) {
+      if (err.code === 'ENOENT') return cb()
+      return cb(err)
+    }
+    if (areIdentical(srcStat, destStat)) {
+      return cb(new Error(errMsg(src, dest, funcName)))
+    }
+    return checkParentPaths(src, srcStat, destParent, funcName, cb)
+  }
+  if (nodeSupportsBigInt) fs.stat(destParent, { bigint: true }, callback)
+  else fs.stat(destParent, callback)
+}
 
-// Expose visitors.
-proto.visitors = {
-  root: __webpack_require__(128),
-  text: __webpack_require__(543),
-  heading: __webpack_require__(236),
-  paragraph: __webpack_require__(174),
-  blockquote: __webpack_require__(676),
-  list: __webpack_require__(209),
-  listItem: __webpack_require__(355),
-  inlineCode: __webpack_require__(712),
-  code: __webpack_require__(935),
-  html: __webpack_require__(139),
-  thematicBreak: __webpack_require__(688),
-  strong: __webpack_require__(411),
-  emphasis: __webpack_require__(576),
-  break: __webpack_require__(972),
-  delete: __webpack_require__(120),
-  link: __webpack_require__(640),
-  linkReference: __webpack_require__(331),
-  imageReference: __webpack_require__(764),
-  definition: __webpack_require__(459),
-  image: __webpack_require__(333),
-  table: __webpack_require__(884),
-  tableCell: __webpack_require__(151)
+function checkParentPathsSync (src, srcStat, dest, funcName) {
+  const srcParent = path.resolve(path.dirname(src))
+  const destParent = path.resolve(path.dirname(dest))
+  if (destParent === srcParent || destParent === path.parse(destParent).root) return
+  let destStat
+  try {
+    destStat = statSync(destParent)
+  } catch (err) {
+    if (err.code === 'ENOENT') return
+    throw err
+  }
+  if (areIdentical(srcStat, destStat)) {
+    throw new Error(errMsg(src, dest, funcName))
+  }
+  return checkParentPathsSync(src, srcStat, destParent, funcName)
+}
+
+function areIdentical (srcStat, destStat) {
+  if (destStat.ino && destStat.dev && destStat.ino === srcStat.ino && destStat.dev === srcStat.dev) {
+    if (nodeSupportsBigInt || destStat.ino < Number.MAX_SAFE_INTEGER) {
+      // definitive answer
+      return true
+    }
+    // Use additional heuristics if we can't use 'bigint'.
+    // Different 'ino' could be represented the same if they are >= Number.MAX_SAFE_INTEGER
+    // See issue 657
+    if (destStat.size === srcStat.size &&
+        destStat.mode === srcStat.mode &&
+        destStat.nlink === srcStat.nlink &&
+        destStat.atimeMs === srcStat.atimeMs &&
+        destStat.mtimeMs === srcStat.mtimeMs &&
+        destStat.ctimeMs === srcStat.ctimeMs &&
+        destStat.birthtimeMs === srcStat.birthtimeMs) {
+      // heuristic answer
+      return true
+    }
+  }
+  return false
+}
+
+// return true if dest is a subdir of src, otherwise false.
+// It only checks the path strings.
+function isSrcSubdir (src, dest) {
+  const srcArr = path.resolve(src).split(path.sep).filter(i => i)
+  const destArr = path.resolve(dest).split(path.sep).filter(i => i)
+  return srcArr.reduce((acc, cur, i) => acc && destArr[i] === cur, true)
+}
+
+function errMsg (src, dest, funcName) {
+  return `Cannot ${funcName} '${src}' to a subdirectory of itself, '${dest}'.`
+}
+
+module.exports = {
+  checkPaths,
+  checkPathsSync,
+  checkParentPaths,
+  checkParentPathsSync,
+  isSrcSubdir
 }
 
 
@@ -12558,6 +14131,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
+const push_1 = __importDefault(__webpack_require__(760));
 const opened_1 = __importDefault(__webpack_require__(108));
 const created_1 = __importDefault(__webpack_require__(501));
 const run = async () => {
@@ -12565,14 +14139,17 @@ const run = async () => {
     const repoToken = core.getInput('repo-token', { required: true });
     core.info(`Received event: ${eventName}/${action}`);
     try {
-        if (eventName === 'issues' && action === 'opened') {
+        if (eventName === 'push') {
+            await push_1.default(repoToken);
+        }
+        else if (eventName === 'issues' && action === 'opened') {
             await opened_1.default(repoToken);
         }
         else if (eventName === 'issue_comment' && action === 'created') {
             await created_1.default(repoToken);
         }
         else {
-            core.warning(`No handler for ${eventName}`);
+            core.warning(`no handler for ${eventName}/${action}`);
         }
     }
     catch (e) {
@@ -12585,34 +14162,44 @@ run();
 
 /***/ }),
 /* 430 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/** Used for built-in method references. */
-var objectProto = Object.prototype;
+var apply = __webpack_require__(512);
 
-/** Used to check objects for own properties. */
-var hasOwnProperty = objectProto.hasOwnProperty;
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeMax = Math.max;
 
 /**
- * Initializes an array clone.
+ * A specialized version of `baseRest` which transforms the rest array.
  *
  * @private
- * @param {Array} array The array to clone.
- * @returns {Array} Returns the initialized clone.
+ * @param {Function} func The function to apply a rest parameter to.
+ * @param {number} [start=func.length-1] The start position of the rest parameter.
+ * @param {Function} transform The rest array transform.
+ * @returns {Function} Returns the new function.
  */
-function initCloneArray(array) {
-  var length = array.length,
-      result = new array.constructor(length);
+function overRest(func, start, transform) {
+  start = nativeMax(start === undefined ? (func.length - 1) : start, 0);
+  return function() {
+    var args = arguments,
+        index = -1,
+        length = nativeMax(args.length - start, 0),
+        array = Array(length);
 
-  // Add properties assigned by `RegExp#exec`.
-  if (length && typeof array[0] == 'string' && hasOwnProperty.call(array, 'index')) {
-    result.index = array.index;
-    result.input = array.input;
-  }
-  return result;
+    while (++index < length) {
+      array[index] = args[start + index];
+    }
+    index = -1;
+    var otherArgs = Array(start + 1);
+    while (++index < start) {
+      otherArgs[index] = args[index];
+    }
+    otherArgs[start] = transform(array);
+    return apply(func, this, otherArgs);
+  };
 }
 
-module.exports = initCloneArray;
+module.exports = overRest;
 
 
 /***/ }),
@@ -12770,12 +14357,7 @@ function unherit(Super) {
 /* 434 */,
 /* 435 */,
 /* 436 */,
-/* 437 */
-/***/ (function(module) {
-
-module.exports = {"nbsp":" ","iexcl":"¡","cent":"¢","pound":"£","curren":"¤","yen":"¥","brvbar":"¦","sect":"§","uml":"¨","copy":"©","ordf":"ª","laquo":"«","not":"¬","shy":"­","reg":"®","macr":"¯","deg":"°","plusmn":"±","sup2":"²","sup3":"³","acute":"´","micro":"µ","para":"¶","middot":"·","cedil":"¸","sup1":"¹","ordm":"º","raquo":"»","frac14":"¼","frac12":"½","frac34":"¾","iquest":"¿","Agrave":"À","Aacute":"Á","Acirc":"Â","Atilde":"Ã","Auml":"Ä","Aring":"Å","AElig":"Æ","Ccedil":"Ç","Egrave":"È","Eacute":"É","Ecirc":"Ê","Euml":"Ë","Igrave":"Ì","Iacute":"Í","Icirc":"Î","Iuml":"Ï","ETH":"Ð","Ntilde":"Ñ","Ograve":"Ò","Oacute":"Ó","Ocirc":"Ô","Otilde":"Õ","Ouml":"Ö","times":"×","Oslash":"Ø","Ugrave":"Ù","Uacute":"Ú","Ucirc":"Û","Uuml":"Ü","Yacute":"Ý","THORN":"Þ","szlig":"ß","agrave":"à","aacute":"á","acirc":"â","atilde":"ã","auml":"ä","aring":"å","aelig":"æ","ccedil":"ç","egrave":"è","eacute":"é","ecirc":"ê","euml":"ë","igrave":"ì","iacute":"í","icirc":"î","iuml":"ï","eth":"ð","ntilde":"ñ","ograve":"ò","oacute":"ó","ocirc":"ô","otilde":"õ","ouml":"ö","divide":"÷","oslash":"ø","ugrave":"ù","uacute":"ú","ucirc":"û","uuml":"ü","yacute":"ý","thorn":"þ","yuml":"ÿ","fnof":"ƒ","Alpha":"Α","Beta":"Β","Gamma":"Γ","Delta":"Δ","Epsilon":"Ε","Zeta":"Ζ","Eta":"Η","Theta":"Θ","Iota":"Ι","Kappa":"Κ","Lambda":"Λ","Mu":"Μ","Nu":"Ν","Xi":"Ξ","Omicron":"Ο","Pi":"Π","Rho":"Ρ","Sigma":"Σ","Tau":"Τ","Upsilon":"Υ","Phi":"Φ","Chi":"Χ","Psi":"Ψ","Omega":"Ω","alpha":"α","beta":"β","gamma":"γ","delta":"δ","epsilon":"ε","zeta":"ζ","eta":"η","theta":"θ","iota":"ι","kappa":"κ","lambda":"λ","mu":"μ","nu":"ν","xi":"ξ","omicron":"ο","pi":"π","rho":"ρ","sigmaf":"ς","sigma":"σ","tau":"τ","upsilon":"υ","phi":"φ","chi":"χ","psi":"ψ","omega":"ω","thetasym":"ϑ","upsih":"ϒ","piv":"ϖ","bull":"•","hellip":"…","prime":"′","Prime":"″","oline":"‾","frasl":"⁄","weierp":"℘","image":"ℑ","real":"ℜ","trade":"™","alefsym":"ℵ","larr":"←","uarr":"↑","rarr":"→","darr":"↓","harr":"↔","crarr":"↵","lArr":"⇐","uArr":"⇑","rArr":"⇒","dArr":"⇓","hArr":"⇔","forall":"∀","part":"∂","exist":"∃","empty":"∅","nabla":"∇","isin":"∈","notin":"∉","ni":"∋","prod":"∏","sum":"∑","minus":"−","lowast":"∗","radic":"√","prop":"∝","infin":"∞","ang":"∠","and":"∧","or":"∨","cap":"∩","cup":"∪","int":"∫","there4":"∴","sim":"∼","cong":"≅","asymp":"≈","ne":"≠","equiv":"≡","le":"≤","ge":"≥","sub":"⊂","sup":"⊃","nsub":"⊄","sube":"⊆","supe":"⊇","oplus":"⊕","otimes":"⊗","perp":"⊥","sdot":"⋅","lceil":"⌈","rceil":"⌉","lfloor":"⌊","rfloor":"⌋","lang":"〈","rang":"〉","loz":"◊","spades":"♠","clubs":"♣","hearts":"♥","diams":"♦","quot":"\"","amp":"&","lt":"<","gt":">","OElig":"Œ","oelig":"œ","Scaron":"Š","scaron":"š","Yuml":"Ÿ","circ":"ˆ","tilde":"˜","ensp":" ","emsp":" ","thinsp":" ","zwnj":"‌","zwj":"‍","lrm":"‎","rlm":"‏","ndash":"–","mdash":"—","lsquo":"‘","rsquo":"’","sbquo":"‚","ldquo":"“","rdquo":"”","bdquo":"„","dagger":"†","Dagger":"‡","permil":"‰","lsaquo":"‹","rsaquo":"›","euro":"€"};
-
-/***/ }),
+/* 437 */,
 /* 438 */
 /***/ (function(module) {
 
@@ -12801,57 +14383,64 @@ module.exports = setToArray;
 
 /***/ }),
 /* 439 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var cloneArrayBuffer = __webpack_require__(600);
+/***/ (function(module) {
 
 /**
- * Creates a clone of `typedArray`.
+ * This method returns `undefined`.
  *
- * @private
- * @param {Object} typedArray The typed array to clone.
- * @param {boolean} [isDeep] Specify a deep clone.
- * @returns {Object} Returns the cloned typed array.
+ * @static
+ * @memberOf _
+ * @since 2.3.0
+ * @category Util
+ * @example
+ *
+ * _.times(2, _.noop);
+ * // => [undefined, undefined]
  */
-function cloneTypedArray(typedArray, isDeep) {
-  var buffer = isDeep ? cloneArrayBuffer(typedArray.buffer) : typedArray.buffer;
-  return new typedArray.constructor(buffer, typedArray.byteOffset, typedArray.length);
+function noop() {
+  // No operation performed.
 }
 
-module.exports = cloneTypedArray;
+module.exports = noop;
 
 
 /***/ }),
 /* 440 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var memoizeCapped = __webpack_require__(138);
-
-/** Used to match property names within property paths. */
-var rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
-
-/** Used to match backslashes in property paths. */
-var reEscapeChar = /\\(\\)?/g;
+var baseDifference = __webpack_require__(390),
+    baseFlatten = __webpack_require__(496),
+    baseRest = __webpack_require__(272),
+    isArrayLikeObject = __webpack_require__(301);
 
 /**
- * Converts `string` to a property path array.
+ * Creates an array of `array` values not included in the other given arrays
+ * using [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
+ * for equality comparisons. The order and references of result values are
+ * determined by the first array.
  *
- * @private
- * @param {string} string The string to convert.
- * @returns {Array} Returns the property path array.
+ * **Note:** Unlike `_.pullAll`, this method returns a new array.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Array
+ * @param {Array} array The array to inspect.
+ * @param {...Array} [values] The values to exclude.
+ * @returns {Array} Returns the new array of filtered values.
+ * @see _.without, _.xor
+ * @example
+ *
+ * _.difference([2, 1], [2, 3]);
+ * // => [1]
  */
-var stringToPath = memoizeCapped(function(string) {
-  var result = [];
-  if (string.charCodeAt(0) === 46 /* . */) {
-    result.push('');
-  }
-  string.replace(rePropName, function(match, number, quote, subString) {
-    result.push(quote ? subString.replace(reEscapeChar, '$1') : (number || match));
-  });
-  return result;
+var difference = baseRest(function(array, values) {
+  return isArrayLikeObject(array)
+    ? baseDifference(array, baseFlatten(values, 1, isArrayLikeObject, true))
+    : [];
 });
 
-module.exports = stringToPath;
+module.exports = difference;
 
 
 /***/ }),
@@ -13225,11 +14814,11 @@ function inlineHTML(eat, value, silent) {
 "use strict";
 
 
-var entities = __webpack_require__(437)
+var entities = __webpack_require__(204)
 var legacy = __webpack_require__(177)
 var hexadecimal = __webpack_require__(928)
 var decimal = __webpack_require__(926)
-var alphanumerical = __webpack_require__(110)
+var alphanumerical = __webpack_require__(542)
 var dangerous = __webpack_require__(475)
 
 module.exports = encode
@@ -15354,7 +16943,7 @@ module.exports = baseIsNaN;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var arrayEach = __webpack_require__(698),
-    arrayIncludes = __webpack_require__(887);
+    arrayIncludes = __webpack_require__(751);
 
 /** Used to compose bitmasks for function metadata. */
 var WRAP_BIND_FLAG = 1,
@@ -15437,7 +17026,7 @@ var proto = Parser.prototype
 
 // Expose core.
 proto.setOptions = __webpack_require__(94)
-proto.parse = __webpack_require__(371)
+proto.parse = __webpack_require__(734)
 
 // Expose `defaults`.
 proto.options = __webpack_require__(551)
@@ -15504,7 +17093,7 @@ proto.interruptBlockquote = [
 // Handlers.
 proto.blockTokenizers = {
   blankLine: __webpack_require__(506),
-  indentedCode: __webpack_require__(849),
+  indentedCode: __webpack_require__(418),
   fencedCode: __webpack_require__(442),
   blockquote: __webpack_require__(705),
   atxHeading: __webpack_require__(841),
@@ -15513,20 +17102,20 @@ proto.blockTokenizers = {
   setextHeading: __webpack_require__(803),
   html: __webpack_require__(804),
   definition: __webpack_require__(117),
-  table: __webpack_require__(325),
+  table: __webpack_require__(224),
   paragraph: __webpack_require__(157)
 }
 
 proto.inlineTokenizers = {
   escape: __webpack_require__(703),
-  autoLink: __webpack_require__(76),
+  autoLink: __webpack_require__(387),
   url: __webpack_require__(346),
   email: __webpack_require__(783),
   html: __webpack_require__(446),
   link: __webpack_require__(79),
   reference: __webpack_require__(196),
-  strong: __webpack_require__(322),
-  emphasis: __webpack_require__(77),
+  strong: __webpack_require__(372),
+  emphasis: __webpack_require__(106),
   deletion: __webpack_require__(284),
   code: __webpack_require__(784),
   break: __webpack_require__(63),
@@ -15757,183 +17346,7 @@ exports.RequestError = RequestError;
 
 /***/ }),
 /* 464 */,
-/* 465 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-var path = __webpack_require__(622)
-var replace = __webpack_require__(730)
-var buffer = __webpack_require__(619)
-
-module.exports = VFile
-
-var own = {}.hasOwnProperty
-var proto = VFile.prototype
-
-// Order of setting (least specific to most), we need this because otherwise
-// `{stem: 'a', path: '~/b.js'}` would throw, as a path is needed before a
-// stem can be set.
-var order = ['history', 'path', 'basename', 'stem', 'extname', 'dirname']
-
-proto.toString = toString
-
-// Access full path (`~/index.min.js`).
-Object.defineProperty(proto, 'path', {get: getPath, set: setPath})
-
-// Access parent path (`~`).
-Object.defineProperty(proto, 'dirname', {get: getDirname, set: setDirname})
-
-// Access basename (`index.min.js`).
-Object.defineProperty(proto, 'basename', {get: getBasename, set: setBasename})
-
-// Access extname (`.js`).
-Object.defineProperty(proto, 'extname', {get: getExtname, set: setExtname})
-
-// Access stem (`index.min`).
-Object.defineProperty(proto, 'stem', {get: getStem, set: setStem})
-
-// Construct a new file.
-function VFile(options) {
-  var prop
-  var index
-  var length
-
-  if (!options) {
-    options = {}
-  } else if (typeof options === 'string' || buffer(options)) {
-    options = {contents: options}
-  } else if ('message' in options && 'messages' in options) {
-    return options
-  }
-
-  if (!(this instanceof VFile)) {
-    return new VFile(options)
-  }
-
-  this.data = {}
-  this.messages = []
-  this.history = []
-  this.cwd = process.cwd()
-
-  // Set path related properties in the correct order.
-  index = -1
-  length = order.length
-
-  while (++index < length) {
-    prop = order[index]
-
-    if (own.call(options, prop)) {
-      this[prop] = options[prop]
-    }
-  }
-
-  // Set non-path related properties.
-  for (prop in options) {
-    if (order.indexOf(prop) === -1) {
-      this[prop] = options[prop]
-    }
-  }
-}
-
-function getPath() {
-  return this.history[this.history.length - 1]
-}
-
-function setPath(path) {
-  assertNonEmpty(path, 'path')
-
-  if (path !== this.path) {
-    this.history.push(path)
-  }
-}
-
-function getDirname() {
-  return typeof this.path === 'string' ? path.dirname(this.path) : undefined
-}
-
-function setDirname(dirname) {
-  assertPath(this.path, 'dirname')
-  this.path = path.join(dirname || '', this.basename)
-}
-
-function getBasename() {
-  return typeof this.path === 'string' ? path.basename(this.path) : undefined
-}
-
-function setBasename(basename) {
-  assertNonEmpty(basename, 'basename')
-  assertPart(basename, 'basename')
-  this.path = path.join(this.dirname || '', basename)
-}
-
-function getExtname() {
-  return typeof this.path === 'string' ? path.extname(this.path) : undefined
-}
-
-function setExtname(extname) {
-  var ext = extname || ''
-
-  assertPart(ext, 'extname')
-  assertPath(this.path, 'extname')
-
-  if (ext) {
-    if (ext.charAt(0) !== '.') {
-      throw new Error('`extname` must start with `.`')
-    }
-
-    if (ext.indexOf('.', 1) !== -1) {
-      throw new Error('`extname` cannot contain multiple dots')
-    }
-  }
-
-  this.path = replace(this.path, ext)
-}
-
-function getStem() {
-  return typeof this.path === 'string'
-    ? path.basename(this.path, this.extname)
-    : undefined
-}
-
-function setStem(stem) {
-  assertNonEmpty(stem, 'stem')
-  assertPart(stem, 'stem')
-  this.path = path.join(this.dirname || '', stem + (this.extname || ''))
-}
-
-// Get the value of the file.
-function toString(encoding) {
-  var value = this.contents || ''
-  return buffer(value) ? value.toString(encoding) : String(value)
-}
-
-// Assert that `part` is not a path (i.e., does not contain `path.sep`).
-function assertPart(part, name) {
-  if (part.indexOf(path.sep) !== -1) {
-    throw new Error(
-      '`' + name + '` cannot be a path: did not expect `' + path.sep + '`'
-    )
-  }
-}
-
-// Assert that `part` is not empty.
-function assertNonEmpty(part, name) {
-  if (!part) {
-    throw new Error('`' + name + '` cannot be empty')
-  }
-}
-
-// Assert `path` exists.
-function assertPath(path, name) {
-  if (!path) {
-    throw new Error('Setting `' + name + '` requires `path` to be set too')
-  }
-}
-
-
-/***/ }),
+/* 465 */,
 /* 466 */,
 /* 467 */,
 /* 468 */,
@@ -16207,8 +17620,70 @@ exports.getState = getState;
 //# sourceMappingURL=core.js.map
 
 /***/ }),
-/* 471 */,
-/* 472 */,
+/* 471 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var getTag = __webpack_require__(700),
+    isObjectLike = __webpack_require__(337);
+
+/** `Object#toString` result references. */
+var weakMapTag = '[object WeakMap]';
+
+/**
+ * Checks if `value` is classified as a `WeakMap` object.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.3.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a weak map, else `false`.
+ * @example
+ *
+ * _.isWeakMap(new WeakMap);
+ * // => true
+ *
+ * _.isWeakMap(new Map);
+ * // => false
+ */
+function isWeakMap(value) {
+  return isObjectLike(value) && getTag(value) == weakMapTag;
+}
+
+module.exports = isWeakMap;
+
+
+/***/ }),
+/* 472 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const file = __webpack_require__(149)
+const link = __webpack_require__(900)
+const symlink = __webpack_require__(849)
+
+module.exports = {
+  // file
+  createFile: file.createFile,
+  createFileSync: file.createFileSync,
+  ensureFile: file.createFile,
+  ensureFileSync: file.createFileSync,
+  // link
+  createLink: link.createLink,
+  createLinkSync: link.createLinkSync,
+  ensureLink: link.createLink,
+  ensureLinkSync: link.createLinkSync,
+  // symlink
+  createSymlink: symlink.createSymlink,
+  createSymlinkSync: symlink.createSymlinkSync,
+  ensureSymlink: symlink.createSymlink,
+  ensureSymlinkSync: symlink.createSymlinkSync
+}
+
+
+/***/ }),
 /* 473 */
 /***/ (function(module) {
 
@@ -16241,7 +17716,315 @@ module.exports = toSource;
 
 
 /***/ }),
-/* 474 */,
+/* 474 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const fs = __webpack_require__(598)
+const path = __webpack_require__(622)
+const assert = __webpack_require__(357)
+
+const isWindows = (process.platform === 'win32')
+
+function defaults (options) {
+  const methods = [
+    'unlink',
+    'chmod',
+    'stat',
+    'lstat',
+    'rmdir',
+    'readdir'
+  ]
+  methods.forEach(m => {
+    options[m] = options[m] || fs[m]
+    m = m + 'Sync'
+    options[m] = options[m] || fs[m]
+  })
+
+  options.maxBusyTries = options.maxBusyTries || 3
+}
+
+function rimraf (p, options, cb) {
+  let busyTries = 0
+
+  if (typeof options === 'function') {
+    cb = options
+    options = {}
+  }
+
+  assert(p, 'rimraf: missing path')
+  assert.strictEqual(typeof p, 'string', 'rimraf: path should be a string')
+  assert.strictEqual(typeof cb, 'function', 'rimraf: callback function required')
+  assert(options, 'rimraf: invalid options argument provided')
+  assert.strictEqual(typeof options, 'object', 'rimraf: options should be object')
+
+  defaults(options)
+
+  rimraf_(p, options, function CB (er) {
+    if (er) {
+      if ((er.code === 'EBUSY' || er.code === 'ENOTEMPTY' || er.code === 'EPERM') &&
+          busyTries < options.maxBusyTries) {
+        busyTries++
+        const time = busyTries * 100
+        // try again, with the same exact callback as this one.
+        return setTimeout(() => rimraf_(p, options, CB), time)
+      }
+
+      // already gone
+      if (er.code === 'ENOENT') er = null
+    }
+
+    cb(er)
+  })
+}
+
+// Two possible strategies.
+// 1. Assume it's a file.  unlink it, then do the dir stuff on EPERM or EISDIR
+// 2. Assume it's a directory.  readdir, then do the file stuff on ENOTDIR
+//
+// Both result in an extra syscall when you guess wrong.  However, there
+// are likely far more normal files in the world than directories.  This
+// is based on the assumption that a the average number of files per
+// directory is >= 1.
+//
+// If anyone ever complains about this, then I guess the strategy could
+// be made configurable somehow.  But until then, YAGNI.
+function rimraf_ (p, options, cb) {
+  assert(p)
+  assert(options)
+  assert(typeof cb === 'function')
+
+  // sunos lets the root user unlink directories, which is... weird.
+  // so we have to lstat here and make sure it's not a dir.
+  options.lstat(p, (er, st) => {
+    if (er && er.code === 'ENOENT') {
+      return cb(null)
+    }
+
+    // Windows can EPERM on stat.  Life is suffering.
+    if (er && er.code === 'EPERM' && isWindows) {
+      return fixWinEPERM(p, options, er, cb)
+    }
+
+    if (st && st.isDirectory()) {
+      return rmdir(p, options, er, cb)
+    }
+
+    options.unlink(p, er => {
+      if (er) {
+        if (er.code === 'ENOENT') {
+          return cb(null)
+        }
+        if (er.code === 'EPERM') {
+          return (isWindows)
+            ? fixWinEPERM(p, options, er, cb)
+            : rmdir(p, options, er, cb)
+        }
+        if (er.code === 'EISDIR') {
+          return rmdir(p, options, er, cb)
+        }
+      }
+      return cb(er)
+    })
+  })
+}
+
+function fixWinEPERM (p, options, er, cb) {
+  assert(p)
+  assert(options)
+  assert(typeof cb === 'function')
+
+  options.chmod(p, 0o666, er2 => {
+    if (er2) {
+      cb(er2.code === 'ENOENT' ? null : er)
+    } else {
+      options.stat(p, (er3, stats) => {
+        if (er3) {
+          cb(er3.code === 'ENOENT' ? null : er)
+        } else if (stats.isDirectory()) {
+          rmdir(p, options, er, cb)
+        } else {
+          options.unlink(p, cb)
+        }
+      })
+    }
+  })
+}
+
+function fixWinEPERMSync (p, options, er) {
+  let stats
+
+  assert(p)
+  assert(options)
+
+  try {
+    options.chmodSync(p, 0o666)
+  } catch (er2) {
+    if (er2.code === 'ENOENT') {
+      return
+    } else {
+      throw er
+    }
+  }
+
+  try {
+    stats = options.statSync(p)
+  } catch (er3) {
+    if (er3.code === 'ENOENT') {
+      return
+    } else {
+      throw er
+    }
+  }
+
+  if (stats.isDirectory()) {
+    rmdirSync(p, options, er)
+  } else {
+    options.unlinkSync(p)
+  }
+}
+
+function rmdir (p, options, originalEr, cb) {
+  assert(p)
+  assert(options)
+  assert(typeof cb === 'function')
+
+  // try to rmdir first, and only readdir on ENOTEMPTY or EEXIST (SunOS)
+  // if we guessed wrong, and it's not a directory, then
+  // raise the original error.
+  options.rmdir(p, er => {
+    if (er && (er.code === 'ENOTEMPTY' || er.code === 'EEXIST' || er.code === 'EPERM')) {
+      rmkids(p, options, cb)
+    } else if (er && er.code === 'ENOTDIR') {
+      cb(originalEr)
+    } else {
+      cb(er)
+    }
+  })
+}
+
+function rmkids (p, options, cb) {
+  assert(p)
+  assert(options)
+  assert(typeof cb === 'function')
+
+  options.readdir(p, (er, files) => {
+    if (er) return cb(er)
+
+    let n = files.length
+    let errState
+
+    if (n === 0) return options.rmdir(p, cb)
+
+    files.forEach(f => {
+      rimraf(path.join(p, f), options, er => {
+        if (errState) {
+          return
+        }
+        if (er) return cb(errState = er)
+        if (--n === 0) {
+          options.rmdir(p, cb)
+        }
+      })
+    })
+  })
+}
+
+// this looks simpler, and is strictly *faster*, but will
+// tie up the JavaScript thread and fail on excessively
+// deep directory trees.
+function rimrafSync (p, options) {
+  let st
+
+  options = options || {}
+  defaults(options)
+
+  assert(p, 'rimraf: missing path')
+  assert.strictEqual(typeof p, 'string', 'rimraf: path should be a string')
+  assert(options, 'rimraf: missing options')
+  assert.strictEqual(typeof options, 'object', 'rimraf: options should be object')
+
+  try {
+    st = options.lstatSync(p)
+  } catch (er) {
+    if (er.code === 'ENOENT') {
+      return
+    }
+
+    // Windows can EPERM on stat.  Life is suffering.
+    if (er.code === 'EPERM' && isWindows) {
+      fixWinEPERMSync(p, options, er)
+    }
+  }
+
+  try {
+    // sunos lets the root user unlink directories, which is... weird.
+    if (st && st.isDirectory()) {
+      rmdirSync(p, options, null)
+    } else {
+      options.unlinkSync(p)
+    }
+  } catch (er) {
+    if (er.code === 'ENOENT') {
+      return
+    } else if (er.code === 'EPERM') {
+      return isWindows ? fixWinEPERMSync(p, options, er) : rmdirSync(p, options, er)
+    } else if (er.code !== 'EISDIR') {
+      throw er
+    }
+    rmdirSync(p, options, er)
+  }
+}
+
+function rmdirSync (p, options, originalEr) {
+  assert(p)
+  assert(options)
+
+  try {
+    options.rmdirSync(p)
+  } catch (er) {
+    if (er.code === 'ENOTDIR') {
+      throw originalEr
+    } else if (er.code === 'ENOTEMPTY' || er.code === 'EEXIST' || er.code === 'EPERM') {
+      rmkidsSync(p, options)
+    } else if (er.code !== 'ENOENT') {
+      throw er
+    }
+  }
+}
+
+function rmkidsSync (p, options) {
+  assert(p)
+  assert(options)
+  options.readdirSync(p).forEach(f => rimrafSync(path.join(p, f), options))
+
+  if (isWindows) {
+    // We only end up here once we got ENOTEMPTY at least once, and
+    // at this point, we are guaranteed to have removed all the kids.
+    // So, we know that it won't be ENOENT or ENOTDIR or anything else.
+    // try really hard to delete stuff on windows, because it has a
+    // PROFOUNDLY annoying habit of not closing handles promptly when
+    // files are deleted, resulting in spurious ENOTEMPTY errors.
+    const startTime = Date.now()
+    do {
+      try {
+        const ret = options.rmdirSync(p, options)
+        return ret
+      } catch {}
+    } while (Date.now() - startTime < 500) // give up after 500ms
+  } else {
+    const ret = options.rmdirSync(p, options)
+    return ret
+  }
+}
+
+module.exports = rimraf
+rimraf.sync = rimrafSync
+
+
+/***/ }),
 /* 475 */
 /***/ (function(module) {
 
@@ -16353,7 +18136,32 @@ function ok() {
 
 
 /***/ }),
-/* 488 */,
+/* 488 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseSetData = __webpack_require__(82),
+    shortOut = __webpack_require__(304);
+
+/**
+ * Sets metadata for `func`.
+ *
+ * **Note:** If this function becomes hot, i.e. is invoked a lot in a short
+ * period of time, it will trip its breaker and transition to an identity
+ * function to avoid garbage collection pauses in V8. See
+ * [V8 issue 2070](https://bugs.chromium.org/p/v8/issues/detail?id=2070)
+ * for more details.
+ *
+ * @private
+ * @param {Function} func The function to associate metadata with.
+ * @param {*} data The metadata.
+ * @returns {Function} Returns `func`.
+ */
+var setData = shortOut(baseSetData);
+
+module.exports = setData;
+
+
+/***/ }),
 /* 489 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -16413,12 +18221,74 @@ module.exports = resolveCommand;
 /* 492 */,
 /* 493 */,
 /* 494 */,
-/* 495 */,
+/* 495 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var createWrap = __webpack_require__(227);
+
+/** Used to compose bitmasks for function metadata. */
+var WRAP_CURRY_FLAG = 8;
+
+/**
+ * Creates a function that accepts arguments of `func` and either invokes
+ * `func` returning its result, if at least `arity` number of arguments have
+ * been provided, or returns a function that accepts the remaining `func`
+ * arguments, and so on. The arity of `func` may be specified if `func.length`
+ * is not sufficient.
+ *
+ * The `_.curry.placeholder` value, which defaults to `_` in monolithic builds,
+ * may be used as a placeholder for provided arguments.
+ *
+ * **Note:** This method doesn't set the "length" property of curried functions.
+ *
+ * @static
+ * @memberOf _
+ * @since 2.0.0
+ * @category Function
+ * @param {Function} func The function to curry.
+ * @param {number} [arity=func.length] The arity of `func`.
+ * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
+ * @returns {Function} Returns the new curried function.
+ * @example
+ *
+ * var abc = function(a, b, c) {
+ *   return [a, b, c];
+ * };
+ *
+ * var curried = _.curry(abc);
+ *
+ * curried(1)(2)(3);
+ * // => [1, 2, 3]
+ *
+ * curried(1, 2)(3);
+ * // => [1, 2, 3]
+ *
+ * curried(1, 2, 3);
+ * // => [1, 2, 3]
+ *
+ * // Curried with placeholders.
+ * curried(1)(_, 3)(2);
+ * // => [1, 2, 3]
+ */
+function curry(func, arity, guard) {
+  arity = guard ? undefined : arity;
+  var result = createWrap(func, WRAP_CURRY_FLAG, undefined, undefined, undefined, undefined, undefined, arity);
+  result.placeholder = curry.placeholder;
+  return result;
+}
+
+// Assign default placeholders.
+curry.placeholder = {};
+
+module.exports = curry;
+
+
+/***/ }),
 /* 496 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var arrayPush = __webpack_require__(883),
-    isFlattenable = __webpack_require__(609);
+    isFlattenable = __webpack_require__(408);
 
 /**
  * The base implementation of `_.flatten` with support for restricting flattening.
@@ -16472,7 +18342,78 @@ module.exports = Symbol;
 
 /***/ }),
 /* 499 */,
-/* 500 */,
+/* 500 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const fs = __webpack_require__(598)
+const path = __webpack_require__(622)
+const copy = __webpack_require__(774).copy
+const remove = __webpack_require__(723).remove
+const mkdirp = __webpack_require__(727).mkdirp
+const pathExists = __webpack_require__(322).pathExists
+const stat = __webpack_require__(425)
+
+function move (src, dest, opts, cb) {
+  if (typeof opts === 'function') {
+    cb = opts
+    opts = {}
+  }
+
+  const overwrite = opts.overwrite || opts.clobber || false
+
+  stat.checkPaths(src, dest, 'move', (err, stats) => {
+    if (err) return cb(err)
+    const { srcStat } = stats
+    stat.checkParentPaths(src, srcStat, dest, 'move', err => {
+      if (err) return cb(err)
+      mkdirp(path.dirname(dest), err => {
+        if (err) return cb(err)
+        return doRename(src, dest, overwrite, cb)
+      })
+    })
+  })
+}
+
+function doRename (src, dest, overwrite, cb) {
+  if (overwrite) {
+    return remove(dest, err => {
+      if (err) return cb(err)
+      return rename(src, dest, overwrite, cb)
+    })
+  }
+  pathExists(dest, (err, destExists) => {
+    if (err) return cb(err)
+    if (destExists) return cb(new Error('dest already exists.'))
+    return rename(src, dest, overwrite, cb)
+  })
+}
+
+function rename (src, dest, overwrite, cb) {
+  fs.rename(src, dest, err => {
+    if (!err) return cb()
+    if (err.code !== 'EXDEV') return cb(err)
+    return moveAcrossDevice(src, dest, overwrite, cb)
+  })
+}
+
+function moveAcrossDevice (src, dest, overwrite, cb) {
+  const opts = {
+    overwrite,
+    errorOnExist: true
+  }
+  copy(src, dest, opts, err => {
+    if (err) return cb(err)
+    return remove(src, cb)
+  })
+}
+
+module.exports = move
+
+
+/***/ }),
 /* 501 */
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -16535,7 +18476,53 @@ module.exports = toKey;
 
 
 /***/ }),
-/* 504 */,
+/* 504 */
+/***/ (function(module) {
+
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeMax = Math.max;
+
+/**
+ * This function is like `composeArgs` except that the arguments composition
+ * is tailored for `_.partialRight`.
+ *
+ * @private
+ * @param {Array} args The provided arguments.
+ * @param {Array} partials The arguments to append to those provided.
+ * @param {Array} holders The `partials` placeholder indexes.
+ * @params {boolean} [isCurried] Specify composing for a curried function.
+ * @returns {Array} Returns the new array of composed arguments.
+ */
+function composeArgsRight(args, partials, holders, isCurried) {
+  var argsIndex = -1,
+      argsLength = args.length,
+      holdersIndex = -1,
+      holdersLength = holders.length,
+      rightIndex = -1,
+      rightLength = partials.length,
+      rangeLength = nativeMax(argsLength - holdersLength, 0),
+      result = Array(rangeLength + rightLength),
+      isUncurried = !isCurried;
+
+  while (++argsIndex < rangeLength) {
+    result[argsIndex] = args[argsIndex];
+  }
+  var offset = argsIndex;
+  while (++rightIndex < rightLength) {
+    result[offset + rightIndex] = partials[rightIndex];
+  }
+  while (++holdersIndex < holdersLength) {
+    if (isUncurried || argsIndex < argsLength) {
+      result[offset + holders[holdersIndex]] = args[argsIndex++];
+    }
+  }
+  return result;
+}
+
+module.exports = composeArgsRight;
+
+
+/***/ }),
 /* 505 */,
 /* 506 */
 /***/ (function(module) {
@@ -16797,36 +18784,81 @@ module.exports = isPrototype;
 /* 517 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var isStrictComparable = __webpack_require__(258),
-    keys = __webpack_require__(863);
+"use strict";
 
-/**
- * Gets the property names, values, and compare flags of `object`.
- *
- * @private
- * @param {Object} object The object to query.
- * @returns {Array} Returns the match data of `object`.
- */
-function getMatchData(object) {
-  var result = keys(object),
-      length = result.length;
 
-  while (length--) {
-    var key = result[length],
-        value = object[key];
+const u = __webpack_require__(676).fromCallback
+const fs = __webpack_require__(598)
+const path = __webpack_require__(622)
+const mkdir = __webpack_require__(727)
+const pathExists = __webpack_require__(322).pathExists
 
-    result[length] = [key, value, isStrictComparable(value)];
+function outputFile (file, data, encoding, callback) {
+  if (typeof encoding === 'function') {
+    callback = encoding
+    encoding = 'utf8'
   }
-  return result;
+
+  const dir = path.dirname(file)
+  pathExists(dir, (err, itDoes) => {
+    if (err) return callback(err)
+    if (itDoes) return fs.writeFile(file, data, encoding, callback)
+
+    mkdir.mkdirs(dir, err => {
+      if (err) return callback(err)
+
+      fs.writeFile(file, data, encoding, callback)
+    })
+  })
 }
 
-module.exports = getMatchData;
+function outputFileSync (file, ...args) {
+  const dir = path.dirname(file)
+  if (fs.existsSync(dir)) {
+    return fs.writeFileSync(file, ...args)
+  }
+  mkdir.mkdirsSync(dir)
+  fs.writeFileSync(file, ...args)
+}
+
+module.exports = {
+  outputFile: u(outputFile),
+  outputFileSync
+}
 
 
 /***/ }),
 /* 518 */,
 /* 519 */,
-/* 520 */,
+/* 520 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var LazyWrapper = __webpack_require__(37),
+    LodashWrapper = __webpack_require__(58),
+    copyArray = __webpack_require__(239);
+
+/**
+ * Creates a clone of `wrapper`.
+ *
+ * @private
+ * @param {Object} wrapper The wrapper to clone.
+ * @returns {Object} Returns the cloned wrapper.
+ */
+function wrapperClone(wrapper) {
+  if (wrapper instanceof LazyWrapper) {
+    return wrapper.clone();
+  }
+  var result = new LodashWrapper(wrapper.__wrapped__, wrapper.__chain__);
+  result.__actions__ = copyArray(wrapper.__actions__);
+  result.__index__  = wrapper.__index__;
+  result.__values__ = wrapper.__values__;
+  return result;
+}
+
+module.exports = wrapperClone;
+
+
+/***/ }),
 /* 521 */
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -17440,7 +19472,7 @@ var cloneArrayBuffer = __webpack_require__(600),
     cloneDataView = __webpack_require__(0),
     cloneRegExp = __webpack_require__(269),
     cloneSymbol = __webpack_require__(334),
-    cloneTypedArray = __webpack_require__(439);
+    cloneTypedArray = __webpack_require__(831);
 
 /** `Object#toString` result references. */
 var boolTag = '[object Boolean]',
@@ -18084,52 +20116,19 @@ module.exports = nativeKeysIn;
 /* 542 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var apply = __webpack_require__(512),
-    createCtor = __webpack_require__(546),
-    createHybrid = __webpack_require__(224),
-    createRecurry = __webpack_require__(673),
-    getHolder = __webpack_require__(683),
-    replaceHolders = __webpack_require__(944),
-    root = __webpack_require__(824);
+"use strict";
 
-/**
- * Creates a function that wraps `func` to enable currying.
- *
- * @private
- * @param {Function} func The function to wrap.
- * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
- * @param {number} arity The arity of `func`.
- * @returns {Function} Returns the new wrapped function.
- */
-function createCurry(func, bitmask, arity) {
-  var Ctor = createCtor(func);
 
-  function wrapper() {
-    var length = arguments.length,
-        args = Array(length),
-        index = length,
-        placeholder = getHolder(wrapper);
+var alphabetical = __webpack_require__(341)
+var decimal = __webpack_require__(926)
 
-    while (index--) {
-      args[index] = arguments[index];
-    }
-    var holders = (length < 3 && args[0] !== placeholder && args[length - 1] !== placeholder)
-      ? []
-      : replaceHolders(args, placeholder);
+module.exports = alphanumerical
 
-    length -= holders.length;
-    if (length < arity) {
-      return createRecurry(
-        func, bitmask, createHybrid, wrapper.placeholder, undefined,
-        args, holders, undefined, undefined, arity - length);
-    }
-    var fn = (this && this !== root && this instanceof wrapper) ? Ctor : func;
-    return apply(fn, this, args);
-  }
-  return wrapper;
+// Check if the given character code, or the character code at the first
+// character, is alphanumerical.
+function alphanumerical(character) {
+  return alphabetical(character) || decimal(character)
 }
-
-module.exports = createCurry;
 
 
 /***/ }),
@@ -18239,7 +20238,61 @@ module.exports = createBind;
 
 /***/ }),
 /* 548 */,
-/* 549 */,
+/* 549 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseTimes = __webpack_require__(553),
+    isArguments = __webpack_require__(460),
+    isArray = __webpack_require__(143),
+    isBuffer = __webpack_require__(150),
+    isIndex = __webpack_require__(160),
+    isTypedArray = __webpack_require__(850);
+
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Creates an array of the enumerable property names of the array-like `value`.
+ *
+ * @private
+ * @param {*} value The value to query.
+ * @param {boolean} inherited Specify returning inherited property names.
+ * @returns {Array} Returns the array of property names.
+ */
+function arrayLikeKeys(value, inherited) {
+  var isArr = isArray(value),
+      isArg = !isArr && isArguments(value),
+      isBuff = !isArr && !isArg && isBuffer(value),
+      isType = !isArr && !isArg && !isBuff && isTypedArray(value),
+      skipIndexes = isArr || isArg || isBuff || isType,
+      result = skipIndexes ? baseTimes(value.length, String) : [],
+      length = result.length;
+
+  for (var key in value) {
+    if ((inherited || hasOwnProperty.call(value, key)) &&
+        !(skipIndexes && (
+           // Safari 9 has enumerable `arguments.length` in strict mode.
+           key == 'length' ||
+           // Node.js 0.10 has enumerable non-index properties on buffers.
+           (isBuff && (key == 'offset' || key == 'parent')) ||
+           // PhantomJS 2 has enumerable non-index properties on typed arrays.
+           (isType && (key == 'buffer' || key == 'byteLength' || key == 'byteOffset')) ||
+           // Skip index properties.
+           isIndex(key, length)
+        ))) {
+      result.push(key);
+    }
+  }
+  return result;
+}
+
+module.exports = arrayLikeKeys;
+
+
+/***/ }),
 /* 550 */,
 /* 551 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -18694,23 +20747,100 @@ function whitespace(character) {
 
 
 /***/ }),
-/* 579 */,
+/* 579 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseGet = __webpack_require__(745);
+
+/**
+ * A specialized version of `baseProperty` which supports deep paths.
+ *
+ * @private
+ * @param {Array|string} path The path of the property to get.
+ * @returns {Function} Returns the new accessor function.
+ */
+function basePropertyDeep(path) {
+  return function(object) {
+    return baseGet(object, path);
+  };
+}
+
+module.exports = basePropertyDeep;
+
+
+/***/ }),
 /* 580 */,
 /* 581 */,
 /* 582 */,
 /* 583 */,
 /* 584 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
-module.exports = function (str) {
-	if (typeof str !== 'string') {
-		throw new TypeError('Expected a string');
-	}
 
-	return !/[^0-9a-z\xDF-\xFF]/.test(str.toLowerCase());
-};
+var trim = __webpack_require__(860)
+var repeat = __webpack_require__(8)
+var getIndent = __webpack_require__(739)
+
+module.exports = indentation
+
+var lineFeed = '\n'
+var space = ' '
+var exclamationMark = '!'
+
+// Remove the minimum indent from every line in `value`.  Supports both tab,
+// spaced, and mixed indentation (as well as possible).
+function indentation(value, maximum) {
+  var values = value.split(lineFeed)
+  var position = values.length + 1
+  var minIndent = Infinity
+  var matrix = []
+  var index
+  var indentation
+  var stops
+
+  values.unshift(repeat(space, maximum) + exclamationMark)
+
+  while (position--) {
+    indentation = getIndent(values[position])
+
+    matrix[position] = indentation.stops
+
+    if (trim(values[position]).length === 0) {
+      continue
+    }
+
+    if (indentation.indent) {
+      if (indentation.indent > 0 && indentation.indent < minIndent) {
+        minIndent = indentation.indent
+      }
+    } else {
+      minIndent = Infinity
+
+      break
+    }
+  }
+
+  if (minIndent !== Infinity) {
+    position = values.length
+
+    while (position--) {
+      stops = matrix[position]
+      index = minIndent
+
+      while (index && !(index in stops)) {
+        index--
+      }
+
+      values[position] = values[position].slice(stops[index] + 1)
+    }
+  }
+
+  values.shift()
+
+  return values.join(lineFeed)
+}
 
 
 /***/ }),
@@ -18878,52 +21008,11 @@ module.exports = equalObjects;
 
 /***/ }),
 /* 587 */,
-/* 588 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var apply = __webpack_require__(512);
-
-/* Built-in method references for those with the same name as other `lodash` methods. */
-var nativeMax = Math.max;
-
-/**
- * A specialized version of `baseRest` which transforms the rest array.
- *
- * @private
- * @param {Function} func The function to apply a rest parameter to.
- * @param {number} [start=func.length-1] The start position of the rest parameter.
- * @param {Function} transform The rest array transform.
- * @returns {Function} Returns the new function.
- */
-function overRest(func, start, transform) {
-  start = nativeMax(start === undefined ? (func.length - 1) : start, 0);
-  return function() {
-    var args = arguments,
-        index = -1,
-        length = nativeMax(args.length - start, 0),
-        array = Array(length);
-
-    while (++index < length) {
-      array[index] = args[start + index];
-    }
-    index = -1;
-    var otherArgs = Array(start + 1);
-    while (++index < start) {
-      otherArgs[index] = args[index];
-    }
-    otherArgs[start] = transform(array);
-    return apply(func, this, otherArgs);
-  };
-}
-
-module.exports = overRest;
-
-
-/***/ }),
+/* 588 */,
 /* 589 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var copyObject = __webpack_require__(875),
+var copyObject = __webpack_require__(765),
     getSymbolsIn = __webpack_require__(386);
 
 /**
@@ -18945,7 +21034,7 @@ module.exports = copySymbolsIn;
 /* 590 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseGetAllKeys = __webpack_require__(857),
+var baseGetAllKeys = __webpack_require__(311),
     getSymbolsIn = __webpack_require__(386),
     keysIn = __webpack_require__(971);
 
@@ -19075,61 +21164,669 @@ function orderedItems(node) {
 
 /***/ }),
 /* 595 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/**
- * Removes `key` and its value from the stack.
- *
- * @private
- * @name delete
- * @memberOf Stack
- * @param {string} key The key of the value to remove.
- * @returns {boolean} Returns `true` if the entry was removed, else `false`.
- */
-function stackDelete(key) {
-  var data = this.__data__,
-      result = data['delete'](key);
+"use strict";
 
-  this.size = data.size;
-  return result;
+
+const fs = __webpack_require__(598)
+const path = __webpack_require__(622)
+const mkdirs = __webpack_require__(727).mkdirs
+const pathExists = __webpack_require__(322).pathExists
+const utimesMillis = __webpack_require__(916).utimesMillis
+const stat = __webpack_require__(425)
+
+function copy (src, dest, opts, cb) {
+  if (typeof opts === 'function' && !cb) {
+    cb = opts
+    opts = {}
+  } else if (typeof opts === 'function') {
+    opts = { filter: opts }
+  }
+
+  cb = cb || function () {}
+  opts = opts || {}
+
+  opts.clobber = 'clobber' in opts ? !!opts.clobber : true // default to true for now
+  opts.overwrite = 'overwrite' in opts ? !!opts.overwrite : opts.clobber // overwrite falls back to clobber
+
+  // Warn about using preserveTimestamps on 32-bit node
+  if (opts.preserveTimestamps && process.arch === 'ia32') {
+    console.warn(`fs-extra: Using the preserveTimestamps option in 32-bit node is not recommended;\n
+    see https://github.com/jprichardson/node-fs-extra/issues/269`)
+  }
+
+  stat.checkPaths(src, dest, 'copy', (err, stats) => {
+    if (err) return cb(err)
+    const { srcStat, destStat } = stats
+    stat.checkParentPaths(src, srcStat, dest, 'copy', err => {
+      if (err) return cb(err)
+      if (opts.filter) return handleFilter(checkParentDir, destStat, src, dest, opts, cb)
+      return checkParentDir(destStat, src, dest, opts, cb)
+    })
+  })
 }
 
-module.exports = stackDelete;
+function checkParentDir (destStat, src, dest, opts, cb) {
+  const destParent = path.dirname(dest)
+  pathExists(destParent, (err, dirExists) => {
+    if (err) return cb(err)
+    if (dirExists) return startCopy(destStat, src, dest, opts, cb)
+    mkdirs(destParent, err => {
+      if (err) return cb(err)
+      return startCopy(destStat, src, dest, opts, cb)
+    })
+  })
+}
+
+function handleFilter (onInclude, destStat, src, dest, opts, cb) {
+  Promise.resolve(opts.filter(src, dest)).then(include => {
+    if (include) return onInclude(destStat, src, dest, opts, cb)
+    return cb()
+  }, error => cb(error))
+}
+
+function startCopy (destStat, src, dest, opts, cb) {
+  if (opts.filter) return handleFilter(getStats, destStat, src, dest, opts, cb)
+  return getStats(destStat, src, dest, opts, cb)
+}
+
+function getStats (destStat, src, dest, opts, cb) {
+  const stat = opts.dereference ? fs.stat : fs.lstat
+  stat(src, (err, srcStat) => {
+    if (err) return cb(err)
+
+    if (srcStat.isDirectory()) return onDir(srcStat, destStat, src, dest, opts, cb)
+    else if (srcStat.isFile() ||
+             srcStat.isCharacterDevice() ||
+             srcStat.isBlockDevice()) return onFile(srcStat, destStat, src, dest, opts, cb)
+    else if (srcStat.isSymbolicLink()) return onLink(destStat, src, dest, opts, cb)
+  })
+}
+
+function onFile (srcStat, destStat, src, dest, opts, cb) {
+  if (!destStat) return copyFile(srcStat, src, dest, opts, cb)
+  return mayCopyFile(srcStat, src, dest, opts, cb)
+}
+
+function mayCopyFile (srcStat, src, dest, opts, cb) {
+  if (opts.overwrite) {
+    fs.unlink(dest, err => {
+      if (err) return cb(err)
+      return copyFile(srcStat, src, dest, opts, cb)
+    })
+  } else if (opts.errorOnExist) {
+    return cb(new Error(`'${dest}' already exists`))
+  } else return cb()
+}
+
+function copyFile (srcStat, src, dest, opts, cb) {
+  fs.copyFile(src, dest, err => {
+    if (err) return cb(err)
+    if (opts.preserveTimestamps) return handleTimestampsAndMode(srcStat.mode, src, dest, cb)
+    return setDestMode(dest, srcStat.mode, cb)
+  })
+}
+
+function handleTimestampsAndMode (srcMode, src, dest, cb) {
+  // Make sure the file is writable before setting the timestamp
+  // otherwise open fails with EPERM when invoked with 'r+'
+  // (through utimes call)
+  if (fileIsNotWritable(srcMode)) {
+    return makeFileWritable(dest, srcMode, err => {
+      if (err) return cb(err)
+      return setDestTimestampsAndMode(srcMode, src, dest, cb)
+    })
+  }
+  return setDestTimestampsAndMode(srcMode, src, dest, cb)
+}
+
+function fileIsNotWritable (srcMode) {
+  return (srcMode & 0o200) === 0
+}
+
+function makeFileWritable (dest, srcMode, cb) {
+  return setDestMode(dest, srcMode | 0o200, cb)
+}
+
+function setDestTimestampsAndMode (srcMode, src, dest, cb) {
+  setDestTimestamps(src, dest, err => {
+    if (err) return cb(err)
+    return setDestMode(dest, srcMode, cb)
+  })
+}
+
+function setDestMode (dest, srcMode, cb) {
+  return fs.chmod(dest, srcMode, cb)
+}
+
+function setDestTimestamps (src, dest, cb) {
+  // The initial srcStat.atime cannot be trusted
+  // because it is modified by the read(2) system call
+  // (See https://nodejs.org/api/fs.html#fs_stat_time_values)
+  fs.stat(src, (err, updatedSrcStat) => {
+    if (err) return cb(err)
+    return utimesMillis(dest, updatedSrcStat.atime, updatedSrcStat.mtime, cb)
+  })
+}
+
+function onDir (srcStat, destStat, src, dest, opts, cb) {
+  if (!destStat) return mkDirAndCopy(srcStat.mode, src, dest, opts, cb)
+  if (destStat && !destStat.isDirectory()) {
+    return cb(new Error(`Cannot overwrite non-directory '${dest}' with directory '${src}'.`))
+  }
+  return copyDir(src, dest, opts, cb)
+}
+
+function mkDirAndCopy (srcMode, src, dest, opts, cb) {
+  fs.mkdir(dest, err => {
+    if (err) return cb(err)
+    copyDir(src, dest, opts, err => {
+      if (err) return cb(err)
+      return setDestMode(dest, srcMode, cb)
+    })
+  })
+}
+
+function copyDir (src, dest, opts, cb) {
+  fs.readdir(src, (err, items) => {
+    if (err) return cb(err)
+    return copyDirItems(items, src, dest, opts, cb)
+  })
+}
+
+function copyDirItems (items, src, dest, opts, cb) {
+  const item = items.pop()
+  if (!item) return cb()
+  return copyDirItem(items, item, src, dest, opts, cb)
+}
+
+function copyDirItem (items, item, src, dest, opts, cb) {
+  const srcItem = path.join(src, item)
+  const destItem = path.join(dest, item)
+  stat.checkPaths(srcItem, destItem, 'copy', (err, stats) => {
+    if (err) return cb(err)
+    const { destStat } = stats
+    startCopy(destStat, srcItem, destItem, opts, err => {
+      if (err) return cb(err)
+      return copyDirItems(items, src, dest, opts, cb)
+    })
+  })
+}
+
+function onLink (destStat, src, dest, opts, cb) {
+  fs.readlink(src, (err, resolvedSrc) => {
+    if (err) return cb(err)
+    if (opts.dereference) {
+      resolvedSrc = path.resolve(process.cwd(), resolvedSrc)
+    }
+
+    if (!destStat) {
+      return fs.symlink(resolvedSrc, dest, cb)
+    } else {
+      fs.readlink(dest, (err, resolvedDest) => {
+        if (err) {
+          // dest exists and is a regular file or directory,
+          // Windows may throw UNKNOWN error. If dest already exists,
+          // fs throws error anyway, so no need to guard against it here.
+          if (err.code === 'EINVAL' || err.code === 'UNKNOWN') return fs.symlink(resolvedSrc, dest, cb)
+          return cb(err)
+        }
+        if (opts.dereference) {
+          resolvedDest = path.resolve(process.cwd(), resolvedDest)
+        }
+        if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
+          return cb(new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`))
+        }
+
+        // do not copy if src is a subdir of dest since unlinking
+        // dest in this case would result in removing src contents
+        // and therefore a broken symlink would be created.
+        if (destStat.isDirectory() && stat.isSrcSubdir(resolvedDest, resolvedSrc)) {
+          return cb(new Error(`Cannot overwrite '${resolvedDest}' with '${resolvedSrc}'.`))
+        }
+        return copyLink(resolvedSrc, dest, cb)
+      })
+    }
+  })
+}
+
+function copyLink (resolvedSrc, dest, cb) {
+  fs.unlink(dest, err => {
+    if (err) return cb(err)
+    return fs.symlink(resolvedSrc, dest, cb)
+  })
+}
+
+module.exports = copy
 
 
 /***/ }),
 /* 596 */,
-/* 597 */,
+/* 597 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var xtend = __webpack_require__(940)
+var toggle = __webpack_require__(4)
+
+module.exports = Compiler
+
+// Construct a new compiler.
+function Compiler(tree, file) {
+  this.inLink = false
+  this.inTable = false
+  this.tree = tree
+  this.file = file
+  this.options = xtend(this.options)
+  this.setOptions({})
+}
+
+var proto = Compiler.prototype
+
+// Enter and exit helpers. */
+proto.enterLink = toggle('inLink', false)
+proto.enterTable = toggle('inTable', false)
+proto.enterLinkReference = __webpack_require__(172)
+
+// Configuration.
+proto.options = __webpack_require__(555)
+proto.setOptions = __webpack_require__(279)
+
+proto.compile = __webpack_require__(310)
+proto.visit = __webpack_require__(675)
+proto.all = __webpack_require__(203)
+proto.block = __webpack_require__(228)
+proto.visitOrderedItems = __webpack_require__(594)
+proto.visitUnorderedItems = __webpack_require__(360)
+
+// Expose visitors.
+proto.visitors = {
+  root: __webpack_require__(128),
+  text: __webpack_require__(543),
+  heading: __webpack_require__(236),
+  paragraph: __webpack_require__(174),
+  blockquote: __webpack_require__(990),
+  list: __webpack_require__(209),
+  listItem: __webpack_require__(355),
+  inlineCode: __webpack_require__(712),
+  code: __webpack_require__(935),
+  html: __webpack_require__(139),
+  thematicBreak: __webpack_require__(688),
+  strong: __webpack_require__(875),
+  emphasis: __webpack_require__(576),
+  break: __webpack_require__(972),
+  delete: __webpack_require__(120),
+  link: __webpack_require__(640),
+  linkReference: __webpack_require__(331),
+  imageReference: __webpack_require__(764),
+  definition: __webpack_require__(459),
+  image: __webpack_require__(333),
+  table: __webpack_require__(884),
+  tableCell: __webpack_require__(854)
+}
+
+
+/***/ }),
 /* 598 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var ListCache = __webpack_require__(670),
-    stackClear = __webpack_require__(564),
-    stackDelete = __webpack_require__(595),
-    stackGet = __webpack_require__(870),
-    stackHas = __webpack_require__(896),
-    stackSet = __webpack_require__(986);
+var fs = __webpack_require__(747)
+var polyfills = __webpack_require__(250)
+var legacy = __webpack_require__(93)
+var clone = __webpack_require__(608)
 
-/**
- * Creates a stack cache object to store key-value pairs.
- *
- * @private
- * @constructor
- * @param {Array} [entries] The key-value pairs to cache.
- */
-function Stack(entries) {
-  var data = this.__data__ = new ListCache(entries);
-  this.size = data.size;
+var util = __webpack_require__(669)
+
+/* istanbul ignore next - node 0.x polyfill */
+var gracefulQueue
+var previousSymbol
+
+/* istanbul ignore else - node 0.x polyfill */
+if (typeof Symbol === 'function' && typeof Symbol.for === 'function') {
+  gracefulQueue = Symbol.for('graceful-fs.queue')
+  // This is used in testing by future versions
+  previousSymbol = Symbol.for('graceful-fs.previous')
+} else {
+  gracefulQueue = '___graceful-fs.queue'
+  previousSymbol = '___graceful-fs.previous'
 }
 
-// Add methods to `Stack`.
-Stack.prototype.clear = stackClear;
-Stack.prototype['delete'] = stackDelete;
-Stack.prototype.get = stackGet;
-Stack.prototype.has = stackHas;
-Stack.prototype.set = stackSet;
+function noop () {}
 
-module.exports = Stack;
+function publishQueue(context, queue) {
+  Object.defineProperty(context, gracefulQueue, {
+    get: function() {
+      return queue
+    }
+  })
+}
+
+var debug = noop
+if (util.debuglog)
+  debug = util.debuglog('gfs4')
+else if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || ''))
+  debug = function() {
+    var m = util.format.apply(util, arguments)
+    m = 'GFS4: ' + m.split(/\n/).join('\nGFS4: ')
+    console.error(m)
+  }
+
+// Once time initialization
+if (!fs[gracefulQueue]) {
+  // This queue can be shared by multiple loaded instances
+  var queue = global[gracefulQueue] || []
+  publishQueue(fs, queue)
+
+  // Patch fs.close/closeSync to shared queue version, because we need
+  // to retry() whenever a close happens *anywhere* in the program.
+  // This is essential when multiple graceful-fs instances are
+  // in play at the same time.
+  fs.close = (function (fs$close) {
+    function close (fd, cb) {
+      return fs$close.call(fs, fd, function (err) {
+        // This function uses the graceful-fs shared queue
+        if (!err) {
+          retry()
+        }
+
+        if (typeof cb === 'function')
+          cb.apply(this, arguments)
+      })
+    }
+
+    Object.defineProperty(close, previousSymbol, {
+      value: fs$close
+    })
+    return close
+  })(fs.close)
+
+  fs.closeSync = (function (fs$closeSync) {
+    function closeSync (fd) {
+      // This function uses the graceful-fs shared queue
+      fs$closeSync.apply(fs, arguments)
+      retry()
+    }
+
+    Object.defineProperty(closeSync, previousSymbol, {
+      value: fs$closeSync
+    })
+    return closeSync
+  })(fs.closeSync)
+
+  if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || '')) {
+    process.on('exit', function() {
+      debug(fs[gracefulQueue])
+      __webpack_require__(357).equal(fs[gracefulQueue].length, 0)
+    })
+  }
+}
+
+if (!global[gracefulQueue]) {
+  publishQueue(global, fs[gracefulQueue]);
+}
+
+module.exports = patch(clone(fs))
+if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs.__patched) {
+    module.exports = patch(fs)
+    fs.__patched = true;
+}
+
+function patch (fs) {
+  // Everything that references the open() function needs to be in here
+  polyfills(fs)
+  fs.gracefulify = patch
+
+  fs.createReadStream = createReadStream
+  fs.createWriteStream = createWriteStream
+  var fs$readFile = fs.readFile
+  fs.readFile = readFile
+  function readFile (path, options, cb) {
+    if (typeof options === 'function')
+      cb = options, options = null
+
+    return go$readFile(path, options, cb)
+
+    function go$readFile (path, options, cb) {
+      return fs$readFile(path, options, function (err) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$readFile, [path, options, cb]])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+          retry()
+        }
+      })
+    }
+  }
+
+  var fs$writeFile = fs.writeFile
+  fs.writeFile = writeFile
+  function writeFile (path, data, options, cb) {
+    if (typeof options === 'function')
+      cb = options, options = null
+
+    return go$writeFile(path, data, options, cb)
+
+    function go$writeFile (path, data, options, cb) {
+      return fs$writeFile(path, data, options, function (err) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$writeFile, [path, data, options, cb]])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+          retry()
+        }
+      })
+    }
+  }
+
+  var fs$appendFile = fs.appendFile
+  if (fs$appendFile)
+    fs.appendFile = appendFile
+  function appendFile (path, data, options, cb) {
+    if (typeof options === 'function')
+      cb = options, options = null
+
+    return go$appendFile(path, data, options, cb)
+
+    function go$appendFile (path, data, options, cb) {
+      return fs$appendFile(path, data, options, function (err) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$appendFile, [path, data, options, cb]])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+          retry()
+        }
+      })
+    }
+  }
+
+  var fs$readdir = fs.readdir
+  fs.readdir = readdir
+  function readdir (path, options, cb) {
+    var args = [path]
+    if (typeof options !== 'function') {
+      args.push(options)
+    } else {
+      cb = options
+    }
+    args.push(go$readdir$cb)
+
+    return go$readdir(args)
+
+    function go$readdir$cb (err, files) {
+      if (files && files.sort)
+        files.sort()
+
+      if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+        enqueue([go$readdir, [args]])
+
+      else {
+        if (typeof cb === 'function')
+          cb.apply(this, arguments)
+        retry()
+      }
+    }
+  }
+
+  function go$readdir (args) {
+    return fs$readdir.apply(fs, args)
+  }
+
+  if (process.version.substr(0, 4) === 'v0.8') {
+    var legStreams = legacy(fs)
+    ReadStream = legStreams.ReadStream
+    WriteStream = legStreams.WriteStream
+  }
+
+  var fs$ReadStream = fs.ReadStream
+  if (fs$ReadStream) {
+    ReadStream.prototype = Object.create(fs$ReadStream.prototype)
+    ReadStream.prototype.open = ReadStream$open
+  }
+
+  var fs$WriteStream = fs.WriteStream
+  if (fs$WriteStream) {
+    WriteStream.prototype = Object.create(fs$WriteStream.prototype)
+    WriteStream.prototype.open = WriteStream$open
+  }
+
+  Object.defineProperty(fs, 'ReadStream', {
+    get: function () {
+      return ReadStream
+    },
+    set: function (val) {
+      ReadStream = val
+    },
+    enumerable: true,
+    configurable: true
+  })
+  Object.defineProperty(fs, 'WriteStream', {
+    get: function () {
+      return WriteStream
+    },
+    set: function (val) {
+      WriteStream = val
+    },
+    enumerable: true,
+    configurable: true
+  })
+
+  // legacy names
+  var FileReadStream = ReadStream
+  Object.defineProperty(fs, 'FileReadStream', {
+    get: function () {
+      return FileReadStream
+    },
+    set: function (val) {
+      FileReadStream = val
+    },
+    enumerable: true,
+    configurable: true
+  })
+  var FileWriteStream = WriteStream
+  Object.defineProperty(fs, 'FileWriteStream', {
+    get: function () {
+      return FileWriteStream
+    },
+    set: function (val) {
+      FileWriteStream = val
+    },
+    enumerable: true,
+    configurable: true
+  })
+
+  function ReadStream (path, options) {
+    if (this instanceof ReadStream)
+      return fs$ReadStream.apply(this, arguments), this
+    else
+      return ReadStream.apply(Object.create(ReadStream.prototype), arguments)
+  }
+
+  function ReadStream$open () {
+    var that = this
+    open(that.path, that.flags, that.mode, function (err, fd) {
+      if (err) {
+        if (that.autoClose)
+          that.destroy()
+
+        that.emit('error', err)
+      } else {
+        that.fd = fd
+        that.emit('open', fd)
+        that.read()
+      }
+    })
+  }
+
+  function WriteStream (path, options) {
+    if (this instanceof WriteStream)
+      return fs$WriteStream.apply(this, arguments), this
+    else
+      return WriteStream.apply(Object.create(WriteStream.prototype), arguments)
+  }
+
+  function WriteStream$open () {
+    var that = this
+    open(that.path, that.flags, that.mode, function (err, fd) {
+      if (err) {
+        that.destroy()
+        that.emit('error', err)
+      } else {
+        that.fd = fd
+        that.emit('open', fd)
+      }
+    })
+  }
+
+  function createReadStream (path, options) {
+    return new fs.ReadStream(path, options)
+  }
+
+  function createWriteStream (path, options) {
+    return new fs.WriteStream(path, options)
+  }
+
+  var fs$open = fs.open
+  fs.open = open
+  function open (path, flags, mode, cb) {
+    if (typeof mode === 'function')
+      cb = mode, mode = null
+
+    return go$open(path, flags, mode, cb)
+
+    function go$open (path, flags, mode, cb) {
+      return fs$open(path, flags, mode, function (err, fd) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$open, [path, flags, mode, cb]])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+          retry()
+        }
+      })
+    }
+  }
+
+  return fs
+}
+
+function enqueue (elem) {
+  debug('ENQUEUE', elem[0].name, elem[1])
+  fs[gracefulQueue].push(elem)
+}
+
+function retry () {
+  var elem = fs[gracefulQueue].shift()
+  if (elem) {
+    debug('RETRY', elem[0].name, elem[1])
+    elem[0].apply(null, elem[1])
+  }
+}
 
 
 /***/ }),
@@ -19160,12 +21857,28 @@ module.exports = cloneArrayBuffer;
 /* 602 */
 /***/ (function(module) {
 
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
 /**
- * The default argument placeholder value for methods.
- *
- * @type {Object}
+ * Used to resolve the
+ * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+ * of values.
  */
-module.exports = {};
+var nativeObjectToString = objectProto.toString;
+
+/**
+ * Converts `value` to a string using `Object.prototype.toString`.
+ *
+ * @private
+ * @param {*} value The value to convert.
+ * @returns {string} Returns the converted string.
+ */
+function objectToString(value) {
+  return nativeObjectToString.call(value);
+}
+
+module.exports = objectToString;
 
 
 /***/ }),
@@ -19200,37 +21913,37 @@ module.exports = require("http");
 /***/ }),
 /* 606 */,
 /* 607 */,
-/* 608 */,
-/* 609 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/* 608 */
+/***/ (function(module) {
 
-var Symbol = __webpack_require__(498),
-    isArguments = __webpack_require__(460),
-    isArray = __webpack_require__(143);
+"use strict";
 
-/** Built-in value references. */
-var spreadableSymbol = Symbol ? Symbol.isConcatSpreadable : undefined;
 
-/**
- * Checks if `value` is a flattenable `arguments` object or array.
- *
- * @private
- * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if `value` is flattenable, else `false`.
- */
-function isFlattenable(value) {
-  return isArray(value) || isArguments(value) ||
-    !!(spreadableSymbol && value && value[spreadableSymbol]);
+module.exports = clone
+
+function clone (obj) {
+  if (obj === null || typeof obj !== 'object')
+    return obj
+
+  if (obj instanceof Object)
+    var copy = { __proto__: obj.__proto__ }
+  else
+    var copy = Object.create(null)
+
+  Object.getOwnPropertyNames(obj).forEach(function (key) {
+    Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(obj, key))
+  })
+
+  return copy
 }
-
-module.exports = isFlattenable;
 
 
 /***/ }),
+/* 609 */,
 /* 610 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var copyObject = __webpack_require__(875),
+var copyObject = __webpack_require__(765),
     keysIn = __webpack_require__(971);
 
 /**
@@ -19253,69 +21966,170 @@ module.exports = baseAssignIn;
 /* 611 */
 /***/ (function(module) {
 
+/** Used as references for various `Number` constants. */
+var MAX_SAFE_INTEGER = 9007199254740991;
+
 /**
- * This method returns `undefined`.
+ * Checks if `value` is a valid array-like length.
+ *
+ * **Note:** This method is loosely based on
+ * [`ToLength`](http://ecma-international.org/ecma-262/7.0/#sec-tolength).
  *
  * @static
  * @memberOf _
- * @since 2.3.0
- * @category Util
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a valid length, else `false`.
  * @example
  *
- * _.times(2, _.noop);
- * // => [undefined, undefined]
+ * _.isLength(3);
+ * // => true
+ *
+ * _.isLength(Number.MIN_VALUE);
+ * // => false
+ *
+ * _.isLength(Infinity);
+ * // => false
+ *
+ * _.isLength('3');
+ * // => false
  */
-function noop() {
-  // No operation performed.
+function isLength(value) {
+  return typeof value == 'number' &&
+    value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
 }
 
-module.exports = noop;
+module.exports = isLength;
 
 
 /***/ }),
 /* 612 */,
-/* 613 */,
+/* 613 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var memoizeCapped = __webpack_require__(192);
+
+/** Used to match property names within property paths. */
+var rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
+
+/** Used to match backslashes in property paths. */
+var reEscapeChar = /\\(\\)?/g;
+
+/**
+ * Converts `string` to a property path array.
+ *
+ * @private
+ * @param {string} string The string to convert.
+ * @returns {Array} Returns the property path array.
+ */
+var stringToPath = memoizeCapped(function(string) {
+  var result = [];
+  if (string.charCodeAt(0) === 46 /* . */) {
+    result.push('');
+  }
+  string.replace(rePropName, function(match, number, quote, subString) {
+    result.push(quote ? subString.replace(reEscapeChar, '$1') : (number || match));
+  });
+  return result;
+});
+
+module.exports = stringToPath;
+
+
+/***/ }),
 /* 614 */
 /***/ (function(module) {
 
 module.exports = require("events");
 
 /***/ }),
-/* 615 */,
-/* 616 */
-/***/ (function(module, exports, __webpack_require__) {
+/* 615 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/* module decorator */ module = __webpack_require__.nmd(module);
-var freeGlobal = __webpack_require__(973);
+"use strict";
 
-/** Detect free variable `exports`. */
-var freeExports =  true && exports && !exports.nodeType && exports;
 
-/** Detect free variable `module`. */
-var freeModule = freeExports && "object" == 'object' && module && !module.nodeType && module;
+const u = __webpack_require__(676).fromCallback
+const fs = __webpack_require__(598)
+const path = __webpack_require__(622)
+const mkdir = __webpack_require__(727)
+const remove = __webpack_require__(723)
 
-/** Detect the popular CommonJS extension `module.exports`. */
-var moduleExports = freeModule && freeModule.exports === freeExports;
+const emptyDir = u(function emptyDir (dir, callback) {
+  callback = callback || function () {}
+  fs.readdir(dir, (err, items) => {
+    if (err) return mkdir.mkdirs(dir, callback)
 
-/** Detect free variable `process` from Node.js. */
-var freeProcess = moduleExports && freeGlobal.process;
+    items = items.map(item => path.join(dir, item))
 
-/** Used to access faster Node.js helpers. */
-var nodeUtil = (function() {
-  try {
-    // Use `util.types` for Node.js 10+.
-    var types = freeModule && freeModule.require && freeModule.require('util').types;
+    deleteItem()
 
-    if (types) {
-      return types;
+    function deleteItem () {
+      const item = items.pop()
+      if (!item) return callback()
+      remove.remove(item, err => {
+        if (err) return callback(err)
+        deleteItem()
+      })
     }
+  })
+})
 
-    // Legacy `process.binding('util')` for Node.js < 10.
-    return freeProcess && freeProcess.binding && freeProcess.binding('util');
-  } catch (e) {}
-}());
+function emptyDirSync (dir) {
+  let items
+  try {
+    items = fs.readdirSync(dir)
+  } catch {
+    return mkdir.mkdirsSync(dir)
+  }
 
-module.exports = nodeUtil;
+  items.forEach(item => {
+    item = path.join(dir, item)
+    remove.removeSync(item)
+  })
+}
+
+module.exports = {
+  emptyDirSync,
+  emptydirSync: emptyDirSync,
+  emptyDir,
+  emptydir: emptyDir
+}
+
+
+/***/ }),
+/* 616 */
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = label
+
+var leftSquareBracket = '['
+var rightSquareBracket = ']'
+
+var shortcut = 'shortcut'
+var collapsed = 'collapsed'
+
+// Stringify a reference label.
+// Because link references are easily, mistakingly, created (for example,
+// `[foo]`), reference nodes have an extra property depicting how it looked in
+// the original document, so stringification can cause minimal changes.
+function label(node) {
+  var type = node.referenceType
+
+  if (type === shortcut) {
+    return ''
+  }
+
+  return (
+    leftSquareBracket +
+    (type === collapsed ? '' : node.label || node.identifier) +
+    rightSquareBracket
+  )
+}
 
 
 /***/ }),
@@ -19337,24 +22151,13 @@ function identity(value) {
 /* 619 */
 /***/ (function(module) {
 
-/*!
- * Determine if an object is a Buffer
- *
- * @author   Feross Aboukhadijeh <https://feross.org>
- * @license  MIT
- */
-
-module.exports = function isBuffer (obj) {
-  return obj != null && obj.constructor != null &&
-    typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
-}
-
+module.exports = require("constants");
 
 /***/ }),
 /* 620 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var getWrapDetails = __webpack_require__(789),
+var getWrapDetails = __webpack_require__(414),
     insertWrapDetails = __webpack_require__(910),
     setToString = __webpack_require__(70),
     updateWrapDetails = __webpack_require__(457);
@@ -19431,15 +22234,71 @@ module.exports = require("path");
 
 /***/ }),
 /* 623 */,
-/* 624 */,
+/* 624 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var createWrap = __webpack_require__(227),
+    flatRest = __webpack_require__(912);
+
+/** Used to compose bitmasks for function metadata. */
+var WRAP_REARG_FLAG = 256;
+
+/**
+ * Creates a function that invokes `func` with arguments arranged according
+ * to the specified `indexes` where the argument value at the first index is
+ * provided as the first argument, the argument value at the second index is
+ * provided as the second argument, and so on.
+ *
+ * @static
+ * @memberOf _
+ * @since 3.0.0
+ * @category Function
+ * @param {Function} func The function to rearrange arguments for.
+ * @param {...(number|number[])} indexes The arranged argument indexes.
+ * @returns {Function} Returns the new function.
+ * @example
+ *
+ * var rearged = _.rearg(function(a, b, c) {
+ *   return [a, b, c];
+ * }, [2, 0, 1]);
+ *
+ * rearged('b', 'c', 'a')
+ * // => ['a', 'b', 'c']
+ */
+var rearg = flatRest(function(func, indexes) {
+  return createWrap(func, WRAP_REARG_FLAG, undefined, undefined, undefined, indexes);
+});
+
+module.exports = rearg;
+
+
+/***/ }),
 /* 625 */,
 /* 626 */,
 /* 627 */,
-/* 628 */,
+/* 628 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const { stringify } = __webpack_require__(356)
+const { outputFileSync } = __webpack_require__(517)
+
+function outputJsonSync (file, data, options) {
+  const str = stringify(data, options)
+
+  outputFileSync(file, str, options)
+}
+
+module.exports = outputJsonSync
+
+
+/***/ }),
 /* 629 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var copyObject = __webpack_require__(875),
+var copyObject = __webpack_require__(765),
     keys = __webpack_require__(863);
 
 /**
@@ -19634,7 +22493,28 @@ function longestStreak(value, character) {
 /***/ }),
 /* 643 */,
 /* 644 */,
-/* 645 */,
+/* 645 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var copyObject = __webpack_require__(765),
+    getSymbols = __webpack_require__(709);
+
+/**
+ * Copies own symbols of `source` to `object`.
+ *
+ * @private
+ * @param {Object} source The object to copy symbols from.
+ * @param {Object} [object={}] The object to copy symbols to.
+ * @returns {Object} Returns `object`.
+ */
+function copySymbols(source, object) {
+  return copyObject(source, getSymbols(source), object);
+}
+
+module.exports = copySymbols;
+
+
+/***/ }),
 /* 646 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -19646,7 +22526,7 @@ var buffer = __webpack_require__(263)
 var extend = __webpack_require__(374)
 var plain = __webpack_require__(103)
 var trough = __webpack_require__(132)
-var vfile = __webpack_require__(659)
+var vfile = __webpack_require__(789)
 
 // Expose a frozen processor.
 module.exports = unified().freeze()
@@ -20235,62 +23115,7 @@ module.exports = arrayIncludesWith;
 /* 656 */,
 /* 657 */,
 /* 658 */,
-/* 659 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-var VMessage = __webpack_require__(270)
-var VFile = __webpack_require__(465)
-
-module.exports = VFile
-
-var proto = VFile.prototype
-
-proto.message = message
-proto.info = info
-proto.fail = fail
-
-// Create a message with `reason` at `position`.
-// When an error is passed in as `reason`, copies the stack.
-function message(reason, position, origin) {
-  var filePath = this.path
-  var message = new VMessage(reason, position, origin)
-
-  if (filePath) {
-    message.name = filePath + ':' + message.name
-    message.file = filePath
-  }
-
-  message.fatal = false
-
-  this.messages.push(message)
-
-  return message
-}
-
-// Fail: creates a vmessage, associates it with the file, and throws it.
-function fail() {
-  var message = this.message.apply(this, arguments)
-
-  message.fatal = true
-
-  throw message
-}
-
-// Info: creates a vmessage, associates it with the file, and marks the fatality
-// as null.
-function info() {
-  var message = this.message.apply(this, arguments)
-
-  message.fatal = null
-
-  return message
-}
-
-
-/***/ }),
+/* 659 */,
 /* 660 */,
 /* 661 */,
 /* 662 */
@@ -20343,7 +23168,100 @@ module.exports = mapToArray;
 
 /***/ }),
 /* 665 */,
-/* 666 */,
+/* 666 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+let _fs
+try {
+  _fs = __webpack_require__(598)
+} catch (_) {
+  _fs = __webpack_require__(747)
+}
+const universalify = __webpack_require__(676)
+const { stringify, stripBom } = __webpack_require__(356)
+
+async function _readFile (file, options = {}) {
+  if (typeof options === 'string') {
+    options = { encoding: options }
+  }
+
+  const fs = options.fs || _fs
+
+  const shouldThrow = 'throws' in options ? options.throws : true
+
+  let data = await universalify.fromCallback(fs.readFile)(file, options)
+
+  data = stripBom(data)
+
+  let obj
+  try {
+    obj = JSON.parse(data, options ? options.reviver : null)
+  } catch (err) {
+    if (shouldThrow) {
+      err.message = `${file}: ${err.message}`
+      throw err
+    } else {
+      return null
+    }
+  }
+
+  return obj
+}
+
+const readFile = universalify.fromPromise(_readFile)
+
+function readFileSync (file, options = {}) {
+  if (typeof options === 'string') {
+    options = { encoding: options }
+  }
+
+  const fs = options.fs || _fs
+
+  const shouldThrow = 'throws' in options ? options.throws : true
+
+  try {
+    let content = fs.readFileSync(file, options)
+    content = stripBom(content)
+    return JSON.parse(content, options.reviver)
+  } catch (err) {
+    if (shouldThrow) {
+      err.message = `${file}: ${err.message}`
+      throw err
+    } else {
+      return null
+    }
+  }
+}
+
+async function _writeFile (file, obj, options = {}) {
+  const fs = options.fs || _fs
+
+  const str = stringify(obj, options)
+
+  await universalify.fromCallback(fs.writeFile)(file, str, options)
+}
+
+const writeFile = universalify.fromPromise(_writeFile)
+
+function writeFileSync (file, obj, options = {}) {
+  const fs = options.fs || _fs
+
+  const str = stringify(obj, options)
+  // not sure if fs.writeFileSync returns anything, but just in case
+  return fs.writeFileSync(file, str, options)
+}
+
+const jsonfile = {
+  readFile,
+  readFileSync,
+  writeFile,
+  writeFileSync
+}
+
+module.exports = jsonfile
+
+
+/***/ }),
 /* 667 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -20386,37 +23304,7 @@ module.exports = clone;
 
 
 /***/ }),
-/* 668 */
-/***/ (function(module) {
-
-"use strict";
-
-
-module.exports = unorderedItems
-
-var lineFeed = '\n'
-
-var blank = lineFeed + lineFeed
-
-// Visit unordered list items.  Uses `options.bullet` as each item’s bullet.
-function unorderedItems(node) {
-  var self = this
-  var bullet = self.options.bullet
-  var fn = self.visitors.listItem
-  var children = node.children
-  var length = children.length
-  var index = -1
-  var values = []
-
-  while (++index < length) {
-    values[index] = fn.call(self, children[index], node, index, bullet)
-  }
-
-  return values.join(node.spread ? blank : lineFeed)
-}
-
-
-/***/ }),
+/* 668 */,
 /* 669 */
 /***/ (function(module) {
 
@@ -20427,7 +23315,7 @@ module.exports = require("util");
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var listCacheClear = __webpack_require__(22),
-    listCacheDelete = __webpack_require__(776),
+    listCacheDelete = __webpack_require__(906),
     listCacheGet = __webpack_require__(755),
     listCacheHas = __webpack_require__(903),
     listCacheSet = __webpack_require__(268);
@@ -20462,12 +23350,212 @@ module.exports = ListCache;
 
 /***/ }),
 /* 671 */,
-/* 672 */,
+/* 672 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var _a;
+Object.defineProperty(exports, "__esModule", { value: true });
+const assert_1 = __webpack_require__(357);
+const fs = __webpack_require__(747);
+const path = __webpack_require__(622);
+_a = fs.promises, exports.chmod = _a.chmod, exports.copyFile = _a.copyFile, exports.lstat = _a.lstat, exports.mkdir = _a.mkdir, exports.readdir = _a.readdir, exports.readlink = _a.readlink, exports.rename = _a.rename, exports.rmdir = _a.rmdir, exports.stat = _a.stat, exports.symlink = _a.symlink, exports.unlink = _a.unlink;
+exports.IS_WINDOWS = process.platform === 'win32';
+function exists(fsPath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            yield exports.stat(fsPath);
+        }
+        catch (err) {
+            if (err.code === 'ENOENT') {
+                return false;
+            }
+            throw err;
+        }
+        return true;
+    });
+}
+exports.exists = exists;
+function isDirectory(fsPath, useStat = false) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const stats = useStat ? yield exports.stat(fsPath) : yield exports.lstat(fsPath);
+        return stats.isDirectory();
+    });
+}
+exports.isDirectory = isDirectory;
+/**
+ * On OSX/Linux, true if path starts with '/'. On Windows, true for paths like:
+ * \, \hello, \\hello\share, C:, and C:\hello (and corresponding alternate separator cases).
+ */
+function isRooted(p) {
+    p = normalizeSeparators(p);
+    if (!p) {
+        throw new Error('isRooted() parameter "p" cannot be empty');
+    }
+    if (exports.IS_WINDOWS) {
+        return (p.startsWith('\\') || /^[A-Z]:/i.test(p) // e.g. \ or \hello or \\hello
+        ); // e.g. C: or C:\hello
+    }
+    return p.startsWith('/');
+}
+exports.isRooted = isRooted;
+/**
+ * Recursively create a directory at `fsPath`.
+ *
+ * This implementation is optimistic, meaning it attempts to create the full
+ * path first, and backs up the path stack from there.
+ *
+ * @param fsPath The path to create
+ * @param maxDepth The maximum recursion depth
+ * @param depth The current recursion depth
+ */
+function mkdirP(fsPath, maxDepth = 1000, depth = 1) {
+    return __awaiter(this, void 0, void 0, function* () {
+        assert_1.ok(fsPath, 'a path argument must be provided');
+        fsPath = path.resolve(fsPath);
+        if (depth >= maxDepth)
+            return exports.mkdir(fsPath);
+        try {
+            yield exports.mkdir(fsPath);
+            return;
+        }
+        catch (err) {
+            switch (err.code) {
+                case 'ENOENT': {
+                    yield mkdirP(path.dirname(fsPath), maxDepth, depth + 1);
+                    yield exports.mkdir(fsPath);
+                    return;
+                }
+                default: {
+                    let stats;
+                    try {
+                        stats = yield exports.stat(fsPath);
+                    }
+                    catch (err2) {
+                        throw err;
+                    }
+                    if (!stats.isDirectory())
+                        throw err;
+                }
+            }
+        }
+    });
+}
+exports.mkdirP = mkdirP;
+/**
+ * Best effort attempt to determine whether a file exists and is executable.
+ * @param filePath    file path to check
+ * @param extensions  additional file extensions to try
+ * @return if file exists and is executable, returns the file path. otherwise empty string.
+ */
+function tryGetExecutablePath(filePath, extensions) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let stats = undefined;
+        try {
+            // test file exists
+            stats = yield exports.stat(filePath);
+        }
+        catch (err) {
+            if (err.code !== 'ENOENT') {
+                // eslint-disable-next-line no-console
+                console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
+            }
+        }
+        if (stats && stats.isFile()) {
+            if (exports.IS_WINDOWS) {
+                // on Windows, test for valid extension
+                const upperExt = path.extname(filePath).toUpperCase();
+                if (extensions.some(validExt => validExt.toUpperCase() === upperExt)) {
+                    return filePath;
+                }
+            }
+            else {
+                if (isUnixExecutable(stats)) {
+                    return filePath;
+                }
+            }
+        }
+        // try each extension
+        const originalFilePath = filePath;
+        for (const extension of extensions) {
+            filePath = originalFilePath + extension;
+            stats = undefined;
+            try {
+                stats = yield exports.stat(filePath);
+            }
+            catch (err) {
+                if (err.code !== 'ENOENT') {
+                    // eslint-disable-next-line no-console
+                    console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
+                }
+            }
+            if (stats && stats.isFile()) {
+                if (exports.IS_WINDOWS) {
+                    // preserve the case of the actual file (since an extension was appended)
+                    try {
+                        const directory = path.dirname(filePath);
+                        const upperName = path.basename(filePath).toUpperCase();
+                        for (const actualName of yield exports.readdir(directory)) {
+                            if (upperName === actualName.toUpperCase()) {
+                                filePath = path.join(directory, actualName);
+                                break;
+                            }
+                        }
+                    }
+                    catch (err) {
+                        // eslint-disable-next-line no-console
+                        console.log(`Unexpected error attempting to determine the actual case of the file '${filePath}': ${err}`);
+                    }
+                    return filePath;
+                }
+                else {
+                    if (isUnixExecutable(stats)) {
+                        return filePath;
+                    }
+                }
+            }
+        }
+        return '';
+    });
+}
+exports.tryGetExecutablePath = tryGetExecutablePath;
+function normalizeSeparators(p) {
+    p = p || '';
+    if (exports.IS_WINDOWS) {
+        // convert slashes on Windows
+        p = p.replace(/\//g, '\\');
+        // remove redundant slashes
+        return p.replace(/\\\\+/g, '\\');
+    }
+    // remove redundant slashes
+    return p.replace(/\/\/+/g, '/');
+}
+// on Mac/Linux, test the execute bit
+//     R   W  X  R  W X R W X
+//   256 128 64 32 16 8 4 2 1
+function isUnixExecutable(stats) {
+    return ((stats.mode & 1) > 0 ||
+        ((stats.mode & 8) > 0 && stats.gid === process.getgid()) ||
+        ((stats.mode & 64) > 0 && stats.uid === process.getuid()));
+}
+//# sourceMappingURL=io-util.js.map
+
+/***/ }),
 /* 673 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var isLaziable = __webpack_require__(384),
-    setData = __webpack_require__(854),
+    setData = __webpack_require__(488),
     setWrapToString = __webpack_require__(620);
 
 /** Used to compose bitmasks for function metadata. */
@@ -20527,89 +23615,86 @@ module.exports = createRecurry;
 /***/ }),
 /* 674 */,
 /* 675 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var baseConvert = __webpack_require__(71),
-    util = __webpack_require__(798);
-
-/**
- * Converts `func` of `name` to an immutable auto-curried iteratee-first data-last
- * version with conversion `options` applied. If `name` is an object its methods
- * will be converted.
- *
- * @param {string} name The name of the function to wrap.
- * @param {Function} [func] The function to wrap.
- * @param {Object} [options] The options object. See `baseConvert` for more details.
- * @returns {Function|Object} Returns the converted function or object.
- */
-function convert(name, func, options) {
-  return baseConvert(util, name, func, options);
-}
-
-module.exports = convert;
-
-
-/***/ }),
-/* 676 */
 /***/ (function(module) {
 
 "use strict";
 
 
-module.exports = blockquote
+module.exports = one
 
-var lineFeed = '\n'
-var space = ' '
-var greaterThan = '>'
+function one(node, parent) {
+  var self = this
+  var visitors = self.visitors
 
-function blockquote(node) {
-  var values = this.block(node).split(lineFeed)
-  var result = []
-  var length = values.length
-  var index = -1
-  var value
-
-  while (++index < length) {
-    value = values[index]
-    result[index] = (value ? space : '') + value
+  // Fail on unknown nodes.
+  if (typeof visitors[node.type] !== 'function') {
+    self.file.fail(
+      new Error(
+        'Missing compiler for node of type `' + node.type + '`: `' + node + '`'
+      ),
+      node
+    )
   }
 
-  return greaterThan + result.join(lineFeed + greaterThan)
+  return visitors[node.type].call(self, node, parent)
+}
+
+
+/***/ }),
+/* 676 */
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+
+exports.fromCallback = function (fn) {
+  return Object.defineProperty(function (...args) {
+    if (typeof args[args.length - 1] === 'function') fn.apply(this, args)
+    else {
+      return new Promise((resolve, reject) => {
+        fn.apply(
+          this,
+          args.concat([(err, res) => err ? reject(err) : resolve(res)])
+        )
+      })
+    }
+  }, 'name', { value: fn.name })
+}
+
+exports.fromPromise = function (fn) {
+  return Object.defineProperty(function (...args) {
+    const cb = args[args.length - 1]
+    if (typeof cb !== 'function') return fn.apply(this, args)
+    else fn.apply(this, args.slice(0, -1)).then(r => cb(null, r), cb)
+  }, 'name', { value: fn.name })
 }
 
 
 /***/ }),
 /* 677 */,
-/* 678 */
-/***/ (function(module) {
+/* 678 */,
+/* 679 */,
+/* 680 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/** Used for built-in method references. */
-var objectProto = Object.prototype;
-
-/**
- * Used to resolve the
- * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
- * of values.
- */
-var nativeObjectToString = objectProto.toString;
+var metaMap = __webpack_require__(156),
+    noop = __webpack_require__(439);
 
 /**
- * Converts `value` to a string using `Object.prototype.toString`.
+ * Gets metadata for `func`.
  *
  * @private
- * @param {*} value The value to convert.
- * @returns {string} Returns the converted string.
+ * @param {Function} func The function to query.
+ * @returns {*} Returns the metadata for `func`.
  */
-function objectToString(value) {
-  return nativeObjectToString.call(value);
-}
+var getData = !metaMap ? noop : function(func) {
+  return metaMap.get(func);
+};
 
-module.exports = objectToString;
+module.exports = getData;
 
 
 /***/ }),
-/* 679 */,
-/* 680 */,
 /* 681 */
 /***/ (function(module) {
 
@@ -20728,8 +23813,652 @@ function indices(value) {
 
 /***/ }),
 /* 685 */,
-/* 686 */,
-/* 687 */,
+/* 686 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const os = __importStar(__webpack_require__(87));
+const events = __importStar(__webpack_require__(614));
+const child = __importStar(__webpack_require__(129));
+const path = __importStar(__webpack_require__(622));
+const io = __importStar(__webpack_require__(1));
+const ioUtil = __importStar(__webpack_require__(672));
+/* eslint-disable @typescript-eslint/unbound-method */
+const IS_WINDOWS = process.platform === 'win32';
+/*
+ * Class for running command line tools. Handles quoting and arg parsing in a platform agnostic way.
+ */
+class ToolRunner extends events.EventEmitter {
+    constructor(toolPath, args, options) {
+        super();
+        if (!toolPath) {
+            throw new Error("Parameter 'toolPath' cannot be null or empty.");
+        }
+        this.toolPath = toolPath;
+        this.args = args || [];
+        this.options = options || {};
+    }
+    _debug(message) {
+        if (this.options.listeners && this.options.listeners.debug) {
+            this.options.listeners.debug(message);
+        }
+    }
+    _getCommandString(options, noPrefix) {
+        const toolPath = this._getSpawnFileName();
+        const args = this._getSpawnArgs(options);
+        let cmd = noPrefix ? '' : '[command]'; // omit prefix when piped to a second tool
+        if (IS_WINDOWS) {
+            // Windows + cmd file
+            if (this._isCmdFile()) {
+                cmd += toolPath;
+                for (const a of args) {
+                    cmd += ` ${a}`;
+                }
+            }
+            // Windows + verbatim
+            else if (options.windowsVerbatimArguments) {
+                cmd += `"${toolPath}"`;
+                for (const a of args) {
+                    cmd += ` ${a}`;
+                }
+            }
+            // Windows (regular)
+            else {
+                cmd += this._windowsQuoteCmdArg(toolPath);
+                for (const a of args) {
+                    cmd += ` ${this._windowsQuoteCmdArg(a)}`;
+                }
+            }
+        }
+        else {
+            // OSX/Linux - this can likely be improved with some form of quoting.
+            // creating processes on Unix is fundamentally different than Windows.
+            // on Unix, execvp() takes an arg array.
+            cmd += toolPath;
+            for (const a of args) {
+                cmd += ` ${a}`;
+            }
+        }
+        return cmd;
+    }
+    _processLineBuffer(data, strBuffer, onLine) {
+        try {
+            let s = strBuffer + data.toString();
+            let n = s.indexOf(os.EOL);
+            while (n > -1) {
+                const line = s.substring(0, n);
+                onLine(line);
+                // the rest of the string ...
+                s = s.substring(n + os.EOL.length);
+                n = s.indexOf(os.EOL);
+            }
+            strBuffer = s;
+        }
+        catch (err) {
+            // streaming lines to console is best effort.  Don't fail a build.
+            this._debug(`error processing line. Failed with error ${err}`);
+        }
+    }
+    _getSpawnFileName() {
+        if (IS_WINDOWS) {
+            if (this._isCmdFile()) {
+                return process.env['COMSPEC'] || 'cmd.exe';
+            }
+        }
+        return this.toolPath;
+    }
+    _getSpawnArgs(options) {
+        if (IS_WINDOWS) {
+            if (this._isCmdFile()) {
+                let argline = `/D /S /C "${this._windowsQuoteCmdArg(this.toolPath)}`;
+                for (const a of this.args) {
+                    argline += ' ';
+                    argline += options.windowsVerbatimArguments
+                        ? a
+                        : this._windowsQuoteCmdArg(a);
+                }
+                argline += '"';
+                return [argline];
+            }
+        }
+        return this.args;
+    }
+    _endsWith(str, end) {
+        return str.endsWith(end);
+    }
+    _isCmdFile() {
+        const upperToolPath = this.toolPath.toUpperCase();
+        return (this._endsWith(upperToolPath, '.CMD') ||
+            this._endsWith(upperToolPath, '.BAT'));
+    }
+    _windowsQuoteCmdArg(arg) {
+        // for .exe, apply the normal quoting rules that libuv applies
+        if (!this._isCmdFile()) {
+            return this._uvQuoteCmdArg(arg);
+        }
+        // otherwise apply quoting rules specific to the cmd.exe command line parser.
+        // the libuv rules are generic and are not designed specifically for cmd.exe
+        // command line parser.
+        //
+        // for a detailed description of the cmd.exe command line parser, refer to
+        // http://stackoverflow.com/questions/4094699/how-does-the-windows-command-interpreter-cmd-exe-parse-scripts/7970912#7970912
+        // need quotes for empty arg
+        if (!arg) {
+            return '""';
+        }
+        // determine whether the arg needs to be quoted
+        const cmdSpecialChars = [
+            ' ',
+            '\t',
+            '&',
+            '(',
+            ')',
+            '[',
+            ']',
+            '{',
+            '}',
+            '^',
+            '=',
+            ';',
+            '!',
+            "'",
+            '+',
+            ',',
+            '`',
+            '~',
+            '|',
+            '<',
+            '>',
+            '"'
+        ];
+        let needsQuotes = false;
+        for (const char of arg) {
+            if (cmdSpecialChars.some(x => x === char)) {
+                needsQuotes = true;
+                break;
+            }
+        }
+        // short-circuit if quotes not needed
+        if (!needsQuotes) {
+            return arg;
+        }
+        // the following quoting rules are very similar to the rules that by libuv applies.
+        //
+        // 1) wrap the string in quotes
+        //
+        // 2) double-up quotes - i.e. " => ""
+        //
+        //    this is different from the libuv quoting rules. libuv replaces " with \", which unfortunately
+        //    doesn't work well with a cmd.exe command line.
+        //
+        //    note, replacing " with "" also works well if the arg is passed to a downstream .NET console app.
+        //    for example, the command line:
+        //          foo.exe "myarg:""my val"""
+        //    is parsed by a .NET console app into an arg array:
+        //          [ "myarg:\"my val\"" ]
+        //    which is the same end result when applying libuv quoting rules. although the actual
+        //    command line from libuv quoting rules would look like:
+        //          foo.exe "myarg:\"my val\""
+        //
+        // 3) double-up slashes that precede a quote,
+        //    e.g.  hello \world    => "hello \world"
+        //          hello\"world    => "hello\\""world"
+        //          hello\\"world   => "hello\\\\""world"
+        //          hello world\    => "hello world\\"
+        //
+        //    technically this is not required for a cmd.exe command line, or the batch argument parser.
+        //    the reasons for including this as a .cmd quoting rule are:
+        //
+        //    a) this is optimized for the scenario where the argument is passed from the .cmd file to an
+        //       external program. many programs (e.g. .NET console apps) rely on the slash-doubling rule.
+        //
+        //    b) it's what we've been doing previously (by deferring to node default behavior) and we
+        //       haven't heard any complaints about that aspect.
+        //
+        // note, a weakness of the quoting rules chosen here, is that % is not escaped. in fact, % cannot be
+        // escaped when used on the command line directly - even though within a .cmd file % can be escaped
+        // by using %%.
+        //
+        // the saving grace is, on the command line, %var% is left as-is if var is not defined. this contrasts
+        // the line parsing rules within a .cmd file, where if var is not defined it is replaced with nothing.
+        //
+        // one option that was explored was replacing % with ^% - i.e. %var% => ^%var^%. this hack would
+        // often work, since it is unlikely that var^ would exist, and the ^ character is removed when the
+        // variable is used. the problem, however, is that ^ is not removed when %* is used to pass the args
+        // to an external program.
+        //
+        // an unexplored potential solution for the % escaping problem, is to create a wrapper .cmd file.
+        // % can be escaped within a .cmd file.
+        let reverse = '"';
+        let quoteHit = true;
+        for (let i = arg.length; i > 0; i--) {
+            // walk the string in reverse
+            reverse += arg[i - 1];
+            if (quoteHit && arg[i - 1] === '\\') {
+                reverse += '\\'; // double the slash
+            }
+            else if (arg[i - 1] === '"') {
+                quoteHit = true;
+                reverse += '"'; // double the quote
+            }
+            else {
+                quoteHit = false;
+            }
+        }
+        reverse += '"';
+        return reverse
+            .split('')
+            .reverse()
+            .join('');
+    }
+    _uvQuoteCmdArg(arg) {
+        // Tool runner wraps child_process.spawn() and needs to apply the same quoting as
+        // Node in certain cases where the undocumented spawn option windowsVerbatimArguments
+        // is used.
+        //
+        // Since this function is a port of quote_cmd_arg from Node 4.x (technically, lib UV,
+        // see https://github.com/nodejs/node/blob/v4.x/deps/uv/src/win/process.c for details),
+        // pasting copyright notice from Node within this function:
+        //
+        //      Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+        //
+        //      Permission is hereby granted, free of charge, to any person obtaining a copy
+        //      of this software and associated documentation files (the "Software"), to
+        //      deal in the Software without restriction, including without limitation the
+        //      rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+        //      sell copies of the Software, and to permit persons to whom the Software is
+        //      furnished to do so, subject to the following conditions:
+        //
+        //      The above copyright notice and this permission notice shall be included in
+        //      all copies or substantial portions of the Software.
+        //
+        //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        //      IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        //      FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        //      AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        //      LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+        //      FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+        //      IN THE SOFTWARE.
+        if (!arg) {
+            // Need double quotation for empty argument
+            return '""';
+        }
+        if (!arg.includes(' ') && !arg.includes('\t') && !arg.includes('"')) {
+            // No quotation needed
+            return arg;
+        }
+        if (!arg.includes('"') && !arg.includes('\\')) {
+            // No embedded double quotes or backslashes, so I can just wrap
+            // quote marks around the whole thing.
+            return `"${arg}"`;
+        }
+        // Expected input/output:
+        //   input : hello"world
+        //   output: "hello\"world"
+        //   input : hello""world
+        //   output: "hello\"\"world"
+        //   input : hello\world
+        //   output: hello\world
+        //   input : hello\\world
+        //   output: hello\\world
+        //   input : hello\"world
+        //   output: "hello\\\"world"
+        //   input : hello\\"world
+        //   output: "hello\\\\\"world"
+        //   input : hello world\
+        //   output: "hello world\\" - note the comment in libuv actually reads "hello world\"
+        //                             but it appears the comment is wrong, it should be "hello world\\"
+        let reverse = '"';
+        let quoteHit = true;
+        for (let i = arg.length; i > 0; i--) {
+            // walk the string in reverse
+            reverse += arg[i - 1];
+            if (quoteHit && arg[i - 1] === '\\') {
+                reverse += '\\';
+            }
+            else if (arg[i - 1] === '"') {
+                quoteHit = true;
+                reverse += '\\';
+            }
+            else {
+                quoteHit = false;
+            }
+        }
+        reverse += '"';
+        return reverse
+            .split('')
+            .reverse()
+            .join('');
+    }
+    _cloneExecOptions(options) {
+        options = options || {};
+        const result = {
+            cwd: options.cwd || process.cwd(),
+            env: options.env || process.env,
+            silent: options.silent || false,
+            windowsVerbatimArguments: options.windowsVerbatimArguments || false,
+            failOnStdErr: options.failOnStdErr || false,
+            ignoreReturnCode: options.ignoreReturnCode || false,
+            delay: options.delay || 10000
+        };
+        result.outStream = options.outStream || process.stdout;
+        result.errStream = options.errStream || process.stderr;
+        return result;
+    }
+    _getSpawnOptions(options, toolPath) {
+        options = options || {};
+        const result = {};
+        result.cwd = options.cwd;
+        result.env = options.env;
+        result['windowsVerbatimArguments'] =
+            options.windowsVerbatimArguments || this._isCmdFile();
+        if (options.windowsVerbatimArguments) {
+            result.argv0 = `"${toolPath}"`;
+        }
+        return result;
+    }
+    /**
+     * Exec a tool.
+     * Output will be streamed to the live console.
+     * Returns promise with return code
+     *
+     * @param     tool     path to tool to exec
+     * @param     options  optional exec options.  See ExecOptions
+     * @returns   number
+     */
+    exec() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // root the tool path if it is unrooted and contains relative pathing
+            if (!ioUtil.isRooted(this.toolPath) &&
+                (this.toolPath.includes('/') ||
+                    (IS_WINDOWS && this.toolPath.includes('\\')))) {
+                // prefer options.cwd if it is specified, however options.cwd may also need to be rooted
+                this.toolPath = path.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
+            }
+            // if the tool is only a file name, then resolve it from the PATH
+            // otherwise verify it exists (add extension on Windows if necessary)
+            this.toolPath = yield io.which(this.toolPath, true);
+            return new Promise((resolve, reject) => {
+                this._debug(`exec tool: ${this.toolPath}`);
+                this._debug('arguments:');
+                for (const arg of this.args) {
+                    this._debug(`   ${arg}`);
+                }
+                const optionsNonNull = this._cloneExecOptions(this.options);
+                if (!optionsNonNull.silent && optionsNonNull.outStream) {
+                    optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os.EOL);
+                }
+                const state = new ExecState(optionsNonNull, this.toolPath);
+                state.on('debug', (message) => {
+                    this._debug(message);
+                });
+                const fileName = this._getSpawnFileName();
+                const cp = child.spawn(fileName, this._getSpawnArgs(optionsNonNull), this._getSpawnOptions(this.options, fileName));
+                const stdbuffer = '';
+                if (cp.stdout) {
+                    cp.stdout.on('data', (data) => {
+                        if (this.options.listeners && this.options.listeners.stdout) {
+                            this.options.listeners.stdout(data);
+                        }
+                        if (!optionsNonNull.silent && optionsNonNull.outStream) {
+                            optionsNonNull.outStream.write(data);
+                        }
+                        this._processLineBuffer(data, stdbuffer, (line) => {
+                            if (this.options.listeners && this.options.listeners.stdline) {
+                                this.options.listeners.stdline(line);
+                            }
+                        });
+                    });
+                }
+                const errbuffer = '';
+                if (cp.stderr) {
+                    cp.stderr.on('data', (data) => {
+                        state.processStderr = true;
+                        if (this.options.listeners && this.options.listeners.stderr) {
+                            this.options.listeners.stderr(data);
+                        }
+                        if (!optionsNonNull.silent &&
+                            optionsNonNull.errStream &&
+                            optionsNonNull.outStream) {
+                            const s = optionsNonNull.failOnStdErr
+                                ? optionsNonNull.errStream
+                                : optionsNonNull.outStream;
+                            s.write(data);
+                        }
+                        this._processLineBuffer(data, errbuffer, (line) => {
+                            if (this.options.listeners && this.options.listeners.errline) {
+                                this.options.listeners.errline(line);
+                            }
+                        });
+                    });
+                }
+                cp.on('error', (err) => {
+                    state.processError = err.message;
+                    state.processExited = true;
+                    state.processClosed = true;
+                    state.CheckComplete();
+                });
+                cp.on('exit', (code) => {
+                    state.processExitCode = code;
+                    state.processExited = true;
+                    this._debug(`Exit code ${code} received from tool '${this.toolPath}'`);
+                    state.CheckComplete();
+                });
+                cp.on('close', (code) => {
+                    state.processExitCode = code;
+                    state.processExited = true;
+                    state.processClosed = true;
+                    this._debug(`STDIO streams have closed for tool '${this.toolPath}'`);
+                    state.CheckComplete();
+                });
+                state.on('done', (error, exitCode) => {
+                    if (stdbuffer.length > 0) {
+                        this.emit('stdline', stdbuffer);
+                    }
+                    if (errbuffer.length > 0) {
+                        this.emit('errline', errbuffer);
+                    }
+                    cp.removeAllListeners();
+                    if (error) {
+                        reject(error);
+                    }
+                    else {
+                        resolve(exitCode);
+                    }
+                });
+                if (this.options.input) {
+                    if (!cp.stdin) {
+                        throw new Error('child process missing stdin');
+                    }
+                    cp.stdin.end(this.options.input);
+                }
+            });
+        });
+    }
+}
+exports.ToolRunner = ToolRunner;
+/**
+ * Convert an arg string to an array of args. Handles escaping
+ *
+ * @param    argString   string of arguments
+ * @returns  string[]    array of arguments
+ */
+function argStringToArray(argString) {
+    const args = [];
+    let inQuotes = false;
+    let escaped = false;
+    let arg = '';
+    function append(c) {
+        // we only escape double quotes.
+        if (escaped && c !== '"') {
+            arg += '\\';
+        }
+        arg += c;
+        escaped = false;
+    }
+    for (let i = 0; i < argString.length; i++) {
+        const c = argString.charAt(i);
+        if (c === '"') {
+            if (!escaped) {
+                inQuotes = !inQuotes;
+            }
+            else {
+                append(c);
+            }
+            continue;
+        }
+        if (c === '\\' && escaped) {
+            append(c);
+            continue;
+        }
+        if (c === '\\' && inQuotes) {
+            escaped = true;
+            continue;
+        }
+        if (c === ' ' && !inQuotes) {
+            if (arg.length > 0) {
+                args.push(arg);
+                arg = '';
+            }
+            continue;
+        }
+        append(c);
+    }
+    if (arg.length > 0) {
+        args.push(arg.trim());
+    }
+    return args;
+}
+exports.argStringToArray = argStringToArray;
+class ExecState extends events.EventEmitter {
+    constructor(options, toolPath) {
+        super();
+        this.processClosed = false; // tracks whether the process has exited and stdio is closed
+        this.processError = '';
+        this.processExitCode = 0;
+        this.processExited = false; // tracks whether the process has exited
+        this.processStderr = false; // tracks whether stderr was written to
+        this.delay = 10000; // 10 seconds
+        this.done = false;
+        this.timeout = null;
+        if (!toolPath) {
+            throw new Error('toolPath must not be empty');
+        }
+        this.options = options;
+        this.toolPath = toolPath;
+        if (options.delay) {
+            this.delay = options.delay;
+        }
+    }
+    CheckComplete() {
+        if (this.done) {
+            return;
+        }
+        if (this.processClosed) {
+            this._setResult();
+        }
+        else if (this.processExited) {
+            this.timeout = setTimeout(ExecState.HandleTimeout, this.delay, this);
+        }
+    }
+    _debug(message) {
+        this.emit('debug', message);
+    }
+    _setResult() {
+        // determine whether there is an error
+        let error;
+        if (this.processExited) {
+            if (this.processError) {
+                error = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
+            }
+            else if (this.processExitCode !== 0 && !this.options.ignoreReturnCode) {
+                error = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
+            }
+            else if (this.processStderr && this.options.failOnStdErr) {
+                error = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
+            }
+        }
+        // clear the timeout
+        if (this.timeout) {
+            clearTimeout(this.timeout);
+            this.timeout = null;
+        }
+        this.done = true;
+        this.emit('done', error, this.processExitCode);
+    }
+    static HandleTimeout(state) {
+        if (state.done) {
+            return;
+        }
+        if (!state.processClosed && state.processExited) {
+            const message = `The STDIO streams did not close within ${state.delay /
+                1000} seconds of the exit event from process '${state.toolPath}'. This may indicate a child process inherited the STDIO streams and has not yet exited.`;
+            state._debug(message);
+        }
+        state._setResult();
+    }
+}
+//# sourceMappingURL=toolrunner.js.map
+
+/***/ }),
+/* 687 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var ListCache = __webpack_require__(670),
+    Map = __webpack_require__(864),
+    MapCache = __webpack_require__(978);
+
+/** Used as the size to enable large array optimizations. */
+var LARGE_ARRAY_SIZE = 200;
+
+/**
+ * Sets the stack `key` to `value`.
+ *
+ * @private
+ * @name set
+ * @memberOf Stack
+ * @param {string} key The key of the value to set.
+ * @param {*} value The value to set.
+ * @returns {Object} Returns the stack cache instance.
+ */
+function stackSet(key, value) {
+  var data = this.__data__;
+  if (data instanceof ListCache) {
+    var pairs = data.__data__;
+    if (!Map || (pairs.length < LARGE_ARRAY_SIZE - 1)) {
+      pairs.push([key, value]);
+      this.size = ++data.size;
+      return this;
+    }
+    data = this.__data__ = new MapCache(pairs);
+  }
+  data.set(key, value);
+  this.size = data.size;
+  return this;
+}
+
+module.exports = stackSet;
+
+
+/***/ }),
 /* 688 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -20783,33 +24512,7 @@ try {
 
 
 /***/ }),
-/* 690 */
-/***/ (function(module) {
-
-"use strict";
-
-
-module.exports = one
-
-function one(node, parent) {
-  var self = this
-  var visitors = self.visitors
-
-  // Fail on unknown nodes.
-  if (typeof visitors[node.type] !== 'function') {
-    self.file.fail(
-      new Error(
-        'Missing compiler for node of type `' + node.type + '`: `' + node + '`'
-      ),
-      node
-    )
-  }
-
-  return visitors[node.type].call(self, node, parent)
-}
-
-
-/***/ }),
+/* 690 */,
 /* 691 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -20873,7 +24576,25 @@ exports.Deprecation = Deprecation;
 /***/ }),
 /* 693 */,
 /* 694 */,
-/* 695 */,
+/* 695 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const { stringify } = __webpack_require__(356)
+const { outputFile } = __webpack_require__(517)
+
+async function outputJson (file, data, options = {}) {
+  const str = stringify(data, options)
+
+  await outputFile(file, str, options)
+}
+
+module.exports = outputJson
+
+
+/***/ }),
 /* 696 */
 /***/ (function(module) {
 
@@ -21222,7 +24943,7 @@ function blockquote(eat, value, silent) {
 /* 706 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseGetAllKeys = __webpack_require__(857),
+var baseGetAllKeys = __webpack_require__(311),
     getSymbols = __webpack_require__(709),
     keys = __webpack_require__(863);
 
@@ -21668,7 +25389,7 @@ function ws(code) {
 
 var baseIsSet = __webpack_require__(662),
     baseUnary = __webpack_require__(231),
-    nodeUtil = __webpack_require__(616);
+    nodeUtil = __webpack_require__(138);
 
 /* Node.js helper references. */
 var nodeIsSet = nodeUtil && nodeUtil.isSet;
@@ -21737,10 +25458,122 @@ function locate(value, fromIndex) {
 /* 717 */,
 /* 718 */,
 /* 719 */,
-/* 720 */,
+/* 720 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var composeArgs = __webpack_require__(147),
+    composeArgsRight = __webpack_require__(504),
+    countHolders = __webpack_require__(178),
+    createCtor = __webpack_require__(546),
+    createRecurry = __webpack_require__(673),
+    getHolder = __webpack_require__(683),
+    reorder = __webpack_require__(291),
+    replaceHolders = __webpack_require__(944),
+    root = __webpack_require__(824);
+
+/** Used to compose bitmasks for function metadata. */
+var WRAP_BIND_FLAG = 1,
+    WRAP_BIND_KEY_FLAG = 2,
+    WRAP_CURRY_FLAG = 8,
+    WRAP_CURRY_RIGHT_FLAG = 16,
+    WRAP_ARY_FLAG = 128,
+    WRAP_FLIP_FLAG = 512;
+
+/**
+ * Creates a function that wraps `func` to invoke it with optional `this`
+ * binding of `thisArg`, partial application, and currying.
+ *
+ * @private
+ * @param {Function|string} func The function or method name to wrap.
+ * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
+ * @param {*} [thisArg] The `this` binding of `func`.
+ * @param {Array} [partials] The arguments to prepend to those provided to
+ *  the new function.
+ * @param {Array} [holders] The `partials` placeholder indexes.
+ * @param {Array} [partialsRight] The arguments to append to those provided
+ *  to the new function.
+ * @param {Array} [holdersRight] The `partialsRight` placeholder indexes.
+ * @param {Array} [argPos] The argument positions of the new function.
+ * @param {number} [ary] The arity cap of `func`.
+ * @param {number} [arity] The arity of `func`.
+ * @returns {Function} Returns the new wrapped function.
+ */
+function createHybrid(func, bitmask, thisArg, partials, holders, partialsRight, holdersRight, argPos, ary, arity) {
+  var isAry = bitmask & WRAP_ARY_FLAG,
+      isBind = bitmask & WRAP_BIND_FLAG,
+      isBindKey = bitmask & WRAP_BIND_KEY_FLAG,
+      isCurried = bitmask & (WRAP_CURRY_FLAG | WRAP_CURRY_RIGHT_FLAG),
+      isFlip = bitmask & WRAP_FLIP_FLAG,
+      Ctor = isBindKey ? undefined : createCtor(func);
+
+  function wrapper() {
+    var length = arguments.length,
+        args = Array(length),
+        index = length;
+
+    while (index--) {
+      args[index] = arguments[index];
+    }
+    if (isCurried) {
+      var placeholder = getHolder(wrapper),
+          holdersCount = countHolders(args, placeholder);
+    }
+    if (partials) {
+      args = composeArgs(args, partials, holders, isCurried);
+    }
+    if (partialsRight) {
+      args = composeArgsRight(args, partialsRight, holdersRight, isCurried);
+    }
+    length -= holdersCount;
+    if (isCurried && length < arity) {
+      var newHolders = replaceHolders(args, placeholder);
+      return createRecurry(
+        func, bitmask, createHybrid, wrapper.placeholder, thisArg,
+        args, newHolders, argPos, ary, arity - length
+      );
+    }
+    var thisBinding = isBind ? thisArg : this,
+        fn = isBindKey ? thisBinding[func] : func;
+
+    length = args.length;
+    if (argPos) {
+      args = reorder(args, argPos);
+    } else if (isFlip && length > 1) {
+      args.reverse();
+    }
+    if (isAry && ary < length) {
+      args.length = ary;
+    }
+    if (this && this !== root && this instanceof wrapper) {
+      fn = Ctor || createCtor(fn);
+    }
+    return fn.apply(thisBinding, args);
+  }
+  return wrapper;
+}
+
+module.exports = createHybrid;
+
+
+/***/ }),
 /* 721 */,
 /* 722 */,
-/* 723 */,
+/* 723 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const u = __webpack_require__(676).fromCallback
+const rimraf = __webpack_require__(474)
+
+module.exports = {
+  remove: u(rimraf),
+  removeSync: rimraf.sync
+}
+
+
+/***/ }),
 /* 724 */
 /***/ (function(module) {
 
@@ -21772,29 +25605,23 @@ function locate(value, fromIndex) {
 /***/ }),
 /* 726 */,
 /* 727 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/**
- * A specialized version of `_.map` for arrays without support for iteratee
- * shorthands.
- *
- * @private
- * @param {Array} [array] The array to iterate over.
- * @param {Function} iteratee The function invoked per iteration.
- * @returns {Array} Returns the new mapped array.
- */
-function arrayMap(array, iteratee) {
-  var index = -1,
-      length = array == null ? 0 : array.length,
-      result = Array(length);
+"use strict";
 
-  while (++index < length) {
-    result[index] = iteratee(array[index], index, array);
-  }
-  return result;
+const u = __webpack_require__(676).fromPromise
+const { makeDir: _makeDir, makeDirSync } = __webpack_require__(54)
+const makeDir = u(_makeDir)
+
+module.exports = {
+  mkdirs: makeDir,
+  mkdirsSync: makeDirSync,
+  // alias
+  mkdirp: makeDir,
+  mkdirpSync: makeDirSync,
+  ensureDir: makeDir,
+  ensureDirSync: makeDirSync
 }
-
-module.exports = arrayMap;
 
 
 /***/ }),
@@ -21803,7 +25630,7 @@ module.exports = arrayMap;
 
 var baseIsEqual = __webpack_require__(190),
     get = __webpack_require__(342),
-    hasIn = __webpack_require__(360),
+    hasIn = __webpack_require__(399),
     isKey = __webpack_require__(748),
     isStrictComparable = __webpack_require__(258),
     matchesStrictComparable = __webpack_require__(416),
@@ -21867,49 +25694,51 @@ module.exports = replaceExt;
 /* 732 */,
 /* 733 */,
 /* 734 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/* Built-in method references for those with the same name as other `lodash` methods. */
-var nativeMax = Math.max;
+"use strict";
 
-/**
- * This function is like `composeArgs` except that the arguments composition
- * is tailored for `_.partialRight`.
- *
- * @private
- * @param {Array} args The provided arguments.
- * @param {Array} partials The arguments to append to those provided.
- * @param {Array} holders The `partials` placeholder indexes.
- * @params {boolean} [isCurried] Specify composing for a curried function.
- * @returns {Array} Returns the new array of composed arguments.
- */
-function composeArgsRight(args, partials, holders, isCurried) {
-  var argsIndex = -1,
-      argsLength = args.length,
-      holdersIndex = -1,
-      holdersLength = holders.length,
-      rightIndex = -1,
-      rightLength = partials.length,
-      rangeLength = nativeMax(argsLength - holdersLength, 0),
-      result = Array(rangeLength + rightLength),
-      isUncurried = !isCurried;
 
-  while (++argsIndex < rangeLength) {
-    result[argsIndex] = args[argsIndex];
+var xtend = __webpack_require__(940)
+var removePosition = __webpack_require__(965)
+
+module.exports = parse
+
+var lineFeed = '\n'
+var lineBreaksExpression = /\r\n|\r/g
+
+// Parse the bound file.
+function parse() {
+  var self = this
+  var value = String(self.file)
+  var start = {line: 1, column: 1, offset: 0}
+  var content = xtend(start)
+  var node
+
+  // Clean non-unix newlines: `\r\n` and `\r` are all changed to `\n`.
+  // This should not affect positional information.
+  value = value.replace(lineBreaksExpression, lineFeed)
+
+  // BOM.
+  if (value.charCodeAt(0) === 0xfeff) {
+    value = value.slice(1)
+
+    content.column++
+    content.offset++
   }
-  var offset = argsIndex;
-  while (++rightIndex < rightLength) {
-    result[offset + rightIndex] = partials[rightIndex];
+
+  node = {
+    type: 'root',
+    children: self.tokenizeBlock(value, content),
+    position: {start: start, end: self.eof || xtend(start)}
   }
-  while (++holdersIndex < holdersLength) {
-    if (isUncurried || argsIndex < argsLength) {
-      result[offset + holders[holdersIndex]] = args[argsIndex++];
-    }
+
+  if (!self.options.position) {
+    removePosition(node, true)
   }
-  return result;
+
+  return node
 }
-
-module.exports = composeArgsRight;
 
 
 /***/ }),
@@ -22116,7 +25945,36 @@ module.exports = cloneBuffer;
 
 
 /***/ }),
-/* 745 */,
+/* 745 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var castPath = __webpack_require__(929),
+    toKey = __webpack_require__(503);
+
+/**
+ * The base implementation of `_.get` without support for default values.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {Array|string} path The path of the property to get.
+ * @returns {*} Returns the resolved value.
+ */
+function baseGet(object, path) {
+  path = castPath(path, object);
+
+  var index = 0,
+      length = path.length;
+
+  while (object != null && index < length) {
+    object = object[toKey(path[index++])];
+  }
+  return (index && index == length) ? object : undefined;
+}
+
+module.exports = baseGet;
+
+
+/***/ }),
 /* 746 */,
 /* 747 */
 /***/ (function(module) {
@@ -22164,153 +26022,23 @@ module.exports = isKey;
 /* 751 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var LazyWrapper = __webpack_require__(37),
-    LodashWrapper = __webpack_require__(204),
-    baseLodash = __webpack_require__(681),
-    isArray = __webpack_require__(143),
-    isObjectLike = __webpack_require__(337),
-    wrapperClone = __webpack_require__(953);
-
-/** Used for built-in method references. */
-var objectProto = Object.prototype;
-
-/** Used to check objects for own properties. */
-var hasOwnProperty = objectProto.hasOwnProperty;
+var baseIndexOf = __webpack_require__(571);
 
 /**
- * Creates a `lodash` object which wraps `value` to enable implicit method
- * chain sequences. Methods that operate on and return arrays, collections,
- * and functions can be chained together. Methods that retrieve a single value
- * or may return a primitive value will automatically end the chain sequence
- * and return the unwrapped value. Otherwise, the value must be unwrapped
- * with `_#value`.
+ * A specialized version of `_.includes` for arrays without support for
+ * specifying an index to search from.
  *
- * Explicit chain sequences, which must be unwrapped with `_#value`, may be
- * enabled using `_.chain`.
- *
- * The execution of chained methods is lazy, that is, it's deferred until
- * `_#value` is implicitly or explicitly called.
- *
- * Lazy evaluation allows several methods to support shortcut fusion.
- * Shortcut fusion is an optimization to merge iteratee calls; this avoids
- * the creation of intermediate arrays and can greatly reduce the number of
- * iteratee executions. Sections of a chain sequence qualify for shortcut
- * fusion if the section is applied to an array and iteratees accept only
- * one argument. The heuristic for whether a section qualifies for shortcut
- * fusion is subject to change.
- *
- * Chaining is supported in custom builds as long as the `_#value` method is
- * directly or indirectly included in the build.
- *
- * In addition to lodash methods, wrappers have `Array` and `String` methods.
- *
- * The wrapper `Array` methods are:
- * `concat`, `join`, `pop`, `push`, `shift`, `sort`, `splice`, and `unshift`
- *
- * The wrapper `String` methods are:
- * `replace` and `split`
- *
- * The wrapper methods that support shortcut fusion are:
- * `at`, `compact`, `drop`, `dropRight`, `dropWhile`, `filter`, `find`,
- * `findLast`, `head`, `initial`, `last`, `map`, `reject`, `reverse`, `slice`,
- * `tail`, `take`, `takeRight`, `takeRightWhile`, `takeWhile`, and `toArray`
- *
- * The chainable wrapper methods are:
- * `after`, `ary`, `assign`, `assignIn`, `assignInWith`, `assignWith`, `at`,
- * `before`, `bind`, `bindAll`, `bindKey`, `castArray`, `chain`, `chunk`,
- * `commit`, `compact`, `concat`, `conforms`, `constant`, `countBy`, `create`,
- * `curry`, `debounce`, `defaults`, `defaultsDeep`, `defer`, `delay`,
- * `difference`, `differenceBy`, `differenceWith`, `drop`, `dropRight`,
- * `dropRightWhile`, `dropWhile`, `extend`, `extendWith`, `fill`, `filter`,
- * `flatMap`, `flatMapDeep`, `flatMapDepth`, `flatten`, `flattenDeep`,
- * `flattenDepth`, `flip`, `flow`, `flowRight`, `fromPairs`, `functions`,
- * `functionsIn`, `groupBy`, `initial`, `intersection`, `intersectionBy`,
- * `intersectionWith`, `invert`, `invertBy`, `invokeMap`, `iteratee`, `keyBy`,
- * `keys`, `keysIn`, `map`, `mapKeys`, `mapValues`, `matches`, `matchesProperty`,
- * `memoize`, `merge`, `mergeWith`, `method`, `methodOf`, `mixin`, `negate`,
- * `nthArg`, `omit`, `omitBy`, `once`, `orderBy`, `over`, `overArgs`,
- * `overEvery`, `overSome`, `partial`, `partialRight`, `partition`, `pick`,
- * `pickBy`, `plant`, `property`, `propertyOf`, `pull`, `pullAll`, `pullAllBy`,
- * `pullAllWith`, `pullAt`, `push`, `range`, `rangeRight`, `rearg`, `reject`,
- * `remove`, `rest`, `reverse`, `sampleSize`, `set`, `setWith`, `shuffle`,
- * `slice`, `sort`, `sortBy`, `splice`, `spread`, `tail`, `take`, `takeRight`,
- * `takeRightWhile`, `takeWhile`, `tap`, `throttle`, `thru`, `toArray`,
- * `toPairs`, `toPairsIn`, `toPath`, `toPlainObject`, `transform`, `unary`,
- * `union`, `unionBy`, `unionWith`, `uniq`, `uniqBy`, `uniqWith`, `unset`,
- * `unshift`, `unzip`, `unzipWith`, `update`, `updateWith`, `values`,
- * `valuesIn`, `without`, `wrap`, `xor`, `xorBy`, `xorWith`, `zip`,
- * `zipObject`, `zipObjectDeep`, and `zipWith`
- *
- * The wrapper methods that are **not** chainable by default are:
- * `add`, `attempt`, `camelCase`, `capitalize`, `ceil`, `clamp`, `clone`,
- * `cloneDeep`, `cloneDeepWith`, `cloneWith`, `conformsTo`, `deburr`,
- * `defaultTo`, `divide`, `each`, `eachRight`, `endsWith`, `eq`, `escape`,
- * `escapeRegExp`, `every`, `find`, `findIndex`, `findKey`, `findLast`,
- * `findLastIndex`, `findLastKey`, `first`, `floor`, `forEach`, `forEachRight`,
- * `forIn`, `forInRight`, `forOwn`, `forOwnRight`, `get`, `gt`, `gte`, `has`,
- * `hasIn`, `head`, `identity`, `includes`, `indexOf`, `inRange`, `invoke`,
- * `isArguments`, `isArray`, `isArrayBuffer`, `isArrayLike`, `isArrayLikeObject`,
- * `isBoolean`, `isBuffer`, `isDate`, `isElement`, `isEmpty`, `isEqual`,
- * `isEqualWith`, `isError`, `isFinite`, `isFunction`, `isInteger`, `isLength`,
- * `isMap`, `isMatch`, `isMatchWith`, `isNaN`, `isNative`, `isNil`, `isNull`,
- * `isNumber`, `isObject`, `isObjectLike`, `isPlainObject`, `isRegExp`,
- * `isSafeInteger`, `isSet`, `isString`, `isUndefined`, `isTypedArray`,
- * `isWeakMap`, `isWeakSet`, `join`, `kebabCase`, `last`, `lastIndexOf`,
- * `lowerCase`, `lowerFirst`, `lt`, `lte`, `max`, `maxBy`, `mean`, `meanBy`,
- * `min`, `minBy`, `multiply`, `noConflict`, `noop`, `now`, `nth`, `pad`,
- * `padEnd`, `padStart`, `parseInt`, `pop`, `random`, `reduce`, `reduceRight`,
- * `repeat`, `result`, `round`, `runInContext`, `sample`, `shift`, `size`,
- * `snakeCase`, `some`, `sortedIndex`, `sortedIndexBy`, `sortedLastIndex`,
- * `sortedLastIndexBy`, `startCase`, `startsWith`, `stubArray`, `stubFalse`,
- * `stubObject`, `stubString`, `stubTrue`, `subtract`, `sum`, `sumBy`,
- * `template`, `times`, `toFinite`, `toInteger`, `toJSON`, `toLength`,
- * `toLower`, `toNumber`, `toSafeInteger`, `toString`, `toUpper`, `trim`,
- * `trimEnd`, `trimStart`, `truncate`, `unescape`, `uniqueId`, `upperCase`,
- * `upperFirst`, `value`, and `words`
- *
- * @name _
- * @constructor
- * @category Seq
- * @param {*} value The value to wrap in a `lodash` instance.
- * @returns {Object} Returns the new `lodash` wrapper instance.
- * @example
- *
- * function square(n) {
- *   return n * n;
- * }
- *
- * var wrapped = _([1, 2, 3]);
- *
- * // Returns an unwrapped value.
- * wrapped.reduce(_.add);
- * // => 6
- *
- * // Returns a wrapped value.
- * var squares = wrapped.map(square);
- *
- * _.isArray(squares);
- * // => false
- *
- * _.isArray(squares.value());
- * // => true
+ * @private
+ * @param {Array} [array] The array to inspect.
+ * @param {*} target The value to search for.
+ * @returns {boolean} Returns `true` if `target` is found, else `false`.
  */
-function lodash(value) {
-  if (isObjectLike(value) && !isArray(value) && !(value instanceof LazyWrapper)) {
-    if (value instanceof LodashWrapper) {
-      return value;
-    }
-    if (hasOwnProperty.call(value, '__wrapped__')) {
-      return wrapperClone(value);
-    }
-  }
-  return new LodashWrapper(value);
+function arrayIncludes(array, value) {
+  var length = array == null ? 0 : array.length;
+  return !!length && baseIndexOf(array, value, 0) > -1;
 }
 
-// Ensure wrappers are instances of `baseLodash`.
-lodash.prototype = baseLodash.prototype;
-lodash.prototype.constructor = lodash;
-
-module.exports = lodash;
+module.exports = arrayIncludes;
 
 
 /***/ }),
@@ -22519,24 +26247,104 @@ module.exports = listCacheGet;
 /* 758 */,
 /* 759 */,
 /* 760 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-var copyObject = __webpack_require__(875),
-    getSymbols = __webpack_require__(709);
+"use strict";
 
-/**
- * Copies own symbols of `source` to `object`.
- *
- * @private
- * @param {Object} source The object to copy symbols from.
- * @param {Object} [object={}] The object to copy symbols to.
- * @returns {Object} Returns `object`.
- */
-function copySymbols(source, object) {
-  return copyObject(source, getSymbols(source), object);
-}
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const exec = __importStar(__webpack_require__(986));
+const github = __importStar(__webpack_require__(469));
+const fs_extra_1 = __webpack_require__(226);
+const difference_1 = __importDefault(__webpack_require__(440));
+const markdown_1 = __webpack_require__(184);
+const str_1 = __webpack_require__(410);
+const contributors_1 = __webpack_require__(6);
+const run = async (repoToken) => {
+    const base = 'master';
+    const file = 'README.md';
+    const client = github.getOctokit(repoToken);
+    if (github.context.ref !== `refs/heads/${base}`) {
+        core.info(`not processing for ref: ${github.context.ref}`);
+        return;
+    }
+    const { commits } = github.context.payload;
+    core.info(`processing commits: ${commits.map((commit) => commit.id).join(', ')}`);
+    const authors = commits
+        .map((commit) => commit.author)
+        .filter((author) => !author.username.endsWith('[bot]'));
+    if (authors.length === 0) {
+        core.warning(`no human authors found for commits!`);
+        return;
+    }
+    const authorUsernames = authors.map((author) => author.username);
+    core.info(`authors: ${authorUsernames.join(', ')}`);
+    const contents = await fs_extra_1.readFile(file, 'utf8');
+    const { sections } = markdown_1.parseMarkdownIntoSections(contents);
+    const section = markdown_1.findSectionByLooseTitle(sections, 'contributors');
+    if (!section) {
+        core.warning(`no contributors section in ${file}`);
+        return;
+    }
+    const startIndex = section.nodes.findIndex(n => n.type === 'html' && n.value === '<!-- CONTRIBUTORS:START -->');
+    if (startIndex === -1) {
+        core.warning('no contributors:start tag!');
+        return;
+    }
+    const htmlNode = section.nodes[startIndex + 1];
+    const contributors = contributors_1.parseContributors(htmlNode.value);
+    core.info(`current contributors: ${contributors.length > 0 ? contributors.join(', ') : 'none!'}`);
+    const newContributors = difference_1.default(authorUsernames, contributors);
+    core.info(`new contributors: ${newContributors.length > 0 ? newContributors.join(', ') : 'none!'}`);
+    if (newContributors.length == 0) {
+        return;
+    }
+    const branch = `new-contributors-${newContributors.join('-')}`;
+    let output = '';
+    await exec.exec('git', ['ls-remote', '--heads', 'origin', branch], {
+        listeners: { stdout: data => (output += data.toString()) },
+    });
+    if (output.trim()) {
+        core.warning(`branch ${branch} already exists on remote!`);
+        return;
+    }
+    const allContributors = [...newContributors, ...contributors];
+    const { start: { offset: startOffset }, end: { offset: endOffset }, } = htmlNode.position;
+    const newContents = str_1.replaceRange(contents, startOffset, endOffset, contributors_1.generateContributors(allContributors));
+    const message = `add new contributor${newContributors.length === 1 ? '' : 's'} to ${file}`;
+    await fs_extra_1.writeFile(file, newContents);
+    await exec.exec('git', ['checkout', '-b', branch]);
+    await exec.exec('git', ['add', file]);
+    await exec.exec('git', ['commit', '-m', message]);
+    await exec.exec('git', ['push', 'origin', branch]);
+    await client.pulls.create({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        title: 'New contributors! 💖',
+        body: `
+It looks like there are new contributors in the \`${base}\` branch!
 
-module.exports = copySymbols;
+I've added the following wonderful people to \`${file}\`:
+* ${newContributors.join('\n* ')}
+
+Have a great day!
+Ionitron 💙
+`.trim(),
+        head: branch,
+        base,
+    });
+};
+exports.default = run;
 
 
 /***/ }),
@@ -22576,7 +26384,7 @@ function removeHook (state, name, method) {
 "use strict";
 
 
-var label = __webpack_require__(82)
+var label = __webpack_require__(616)
 
 module.exports = imageReference
 
@@ -22596,8 +26404,79 @@ function imageReference(node) {
 
 
 /***/ }),
-/* 765 */,
-/* 766 */,
+/* 765 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var assignValue = __webpack_require__(691),
+    baseAssignValue = __webpack_require__(772);
+
+/**
+ * Copies properties of `source` to `object`.
+ *
+ * @private
+ * @param {Object} source The object to copy properties from.
+ * @param {Array} props The property identifiers to copy.
+ * @param {Object} [object={}] The object to copy properties to.
+ * @param {Function} [customizer] The function to customize copied values.
+ * @returns {Object} Returns `object`.
+ */
+function copyObject(source, props, object, customizer) {
+  var isNew = !object;
+  object || (object = {});
+
+  var index = -1,
+      length = props.length;
+
+  while (++index < length) {
+    var key = props[index];
+
+    var newValue = customizer
+      ? customizer(object[key], source[key], key, object, source)
+      : undefined;
+
+    if (newValue === undefined) {
+      newValue = source[key];
+    }
+    if (isNew) {
+      baseAssignValue(object, key, newValue);
+    } else {
+      assignValue(object, key, newValue);
+    }
+  }
+  return object;
+}
+
+module.exports = copyObject;
+
+
+/***/ }),
+/* 766 */
+/***/ (function(module) {
+
+/**
+ * A specialized version of `_.map` for arrays without support for iteratee
+ * shorthands.
+ *
+ * @private
+ * @param {Array} [array] The array to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Array} Returns the new mapped array.
+ */
+function arrayMap(array, iteratee) {
+  var index = -1,
+      length = array == null ? 0 : array.length,
+      result = Array(length);
+
+  while (++index < length) {
+    result[index] = iteratee(array[index], index, array);
+  }
+  return result;
+}
+
+module.exports = arrayMap;
+
+
+/***/ }),
 /* 767 */,
 /* 768 */
 /***/ (function(module) {
@@ -22656,14 +26535,17 @@ module.exports = baseAssignValue;
 
 /***/ }),
 /* 773 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var overArg = __webpack_require__(393);
+"use strict";
 
-/* Built-in method references for those with the same name as other `lodash` methods. */
-var nativeKeys = overArg(Object.keys, Object);
+module.exports = function (str) {
+	if (typeof str !== 'string') {
+		throw new TypeError('Expected a string');
+	}
 
-module.exports = nativeKeys;
+	return !/[^0-9a-z\xDF-\xFF]/.test(str.toLowerCase());
+};
 
 
 /***/ }),
@@ -22673,67 +26555,9 @@ module.exports = nativeKeys;
 "use strict";
 
 
-var trim = __webpack_require__(860)
-var repeat = __webpack_require__(8)
-var getIndent = __webpack_require__(739)
-
-module.exports = indentation
-
-var lineFeed = '\n'
-var space = ' '
-var exclamationMark = '!'
-
-// Remove the minimum indent from every line in `value`.  Supports both tab,
-// spaced, and mixed indentation (as well as possible).
-function indentation(value, maximum) {
-  var values = value.split(lineFeed)
-  var position = values.length + 1
-  var minIndent = Infinity
-  var matrix = []
-  var index
-  var indentation
-  var stops
-
-  values.unshift(repeat(space, maximum) + exclamationMark)
-
-  while (position--) {
-    indentation = getIndent(values[position])
-
-    matrix[position] = indentation.stops
-
-    if (trim(values[position]).length === 0) {
-      continue
-    }
-
-    if (indentation.indent) {
-      if (indentation.indent > 0 && indentation.indent < minIndent) {
-        minIndent = indentation.indent
-      }
-    } else {
-      minIndent = Infinity
-
-      break
-    }
-  }
-
-  if (minIndent !== Infinity) {
-    position = values.length
-
-    while (position--) {
-      stops = matrix[position]
-      index = minIndent
-
-      while (index && !(index in stops)) {
-        index--
-      }
-
-      values[position] = values[position].slice(stops[index] + 1)
-    }
-  }
-
-  values.shift()
-
-  return values.join(lineFeed)
+const u = __webpack_require__(676).fromCallback
+module.exports = {
+  copy: u(__webpack_require__(595))
 }
 
 
@@ -22742,41 +26566,37 @@ function indentation(value, maximum) {
 /* 776 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var assocIndexOf = __webpack_require__(820);
-
-/** Used for built-in method references. */
-var arrayProto = Array.prototype;
-
-/** Built-in value references. */
-var splice = arrayProto.splice;
+var baseMatches = __webpack_require__(974),
+    baseMatchesProperty = __webpack_require__(728),
+    identity = __webpack_require__(83),
+    isArray = __webpack_require__(143),
+    property = __webpack_require__(927);
 
 /**
- * Removes `key` and its value from the list cache.
+ * The base implementation of `_.iteratee`.
  *
  * @private
- * @name delete
- * @memberOf ListCache
- * @param {string} key The key of the value to remove.
- * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ * @param {*} [value=_.identity] The value to convert to an iteratee.
+ * @returns {Function} Returns the iteratee.
  */
-function listCacheDelete(key) {
-  var data = this.__data__,
-      index = assocIndexOf(data, key);
-
-  if (index < 0) {
-    return false;
+function baseIteratee(value) {
+  // Don't store the `typeof` result in a variable to avoid a JIT bug in Safari 9.
+  // See https://bugs.webkit.org/show_bug.cgi?id=156034 for more details.
+  if (typeof value == 'function') {
+    return value;
   }
-  var lastIndex = data.length - 1;
-  if (index == lastIndex) {
-    data.pop();
-  } else {
-    splice.call(data, index, 1);
+  if (value == null) {
+    return identity;
   }
-  --this.size;
-  return true;
+  if (typeof value == 'object') {
+    return isArray(value)
+      ? baseMatchesProperty(value[0], value[1])
+      : baseMatches(value);
+  }
+  return property(value);
 }
 
-module.exports = listCacheDelete;
+module.exports = baseIteratee;
 
 
 /***/ }),
@@ -23076,25 +26896,58 @@ function inlineCode(eat, value, silent) {
 /* 787 */,
 /* 788 */,
 /* 789 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/** Used to match wrap detail comments. */
-var reWrapDetails = /\{\n\/\* \[wrapped with (.+)\] \*/,
-    reSplitDetails = /,? & /;
+"use strict";
 
-/**
- * Extracts wrapper details from the `source` body comment.
- *
- * @private
- * @param {string} source The source to inspect.
- * @returns {Array} Returns the wrapper details.
- */
-function getWrapDetails(source) {
-  var match = source.match(reWrapDetails);
-  return match ? match[1].split(reSplitDetails) : [];
+
+var VMessage = __webpack_require__(270)
+var VFile = __webpack_require__(352)
+
+module.exports = VFile
+
+var proto = VFile.prototype
+
+proto.message = message
+proto.info = info
+proto.fail = fail
+
+// Create a message with `reason` at `position`.
+// When an error is passed in as `reason`, copies the stack.
+function message(reason, position, origin) {
+  var filePath = this.path
+  var message = new VMessage(reason, position, origin)
+
+  if (filePath) {
+    message.name = filePath + ':' + message.name
+    message.file = filePath
+  }
+
+  message.fatal = false
+
+  this.messages.push(message)
+
+  return message
 }
 
-module.exports = getWrapDetails;
+// Fail: creates a vmessage, associates it with the file, and throws it.
+function fail() {
+  var message = this.message.apply(this, arguments)
+
+  message.fatal = true
+
+  throw message
+}
+
+// Info: creates a vmessage, associates it with the file, and marks the fatality
+// as null.
+function info() {
+  var message = this.message.apply(this, arguments)
+
+  message.fatal = null
+
+  return message
+}
 
 
 /***/ }),
@@ -23171,7 +27024,24 @@ module.exports = toNumber;
 
 /***/ }),
 /* 791 */,
-/* 792 */,
+/* 792 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const jsonFile = __webpack_require__(666)
+
+module.exports = {
+  // jsonfile exports
+  readJson: jsonFile.readFile,
+  readJsonSync: jsonFile.readFileSync,
+  writeJson: jsonFile.writeFile,
+  writeJsonSync: jsonFile.writeFileSync
+}
+
+
+/***/ }),
 /* 793 */
 /***/ (function(module) {
 
@@ -23293,24 +27163,79 @@ module.exports = {
   'ary': __webpack_require__(445),
   'assign': __webpack_require__(629),
   'clone': __webpack_require__(667),
-  'curry': __webpack_require__(387),
+  'curry': __webpack_require__(495),
   'forEach': __webpack_require__(698),
   'isArray': __webpack_require__(143),
   'isError': __webpack_require__(570),
   'isFunction': __webpack_require__(10),
-  'isWeakMap': __webpack_require__(372),
+  'isWeakMap': __webpack_require__(471),
   'iteratee': __webpack_require__(848),
   'keys': __webpack_require__(351),
-  'rearg': __webpack_require__(930),
+  'rearg': __webpack_require__(624),
   'toInteger': __webpack_require__(528),
-  'toPath': __webpack_require__(106)
+  'toPath': __webpack_require__(855)
 };
 
 
 /***/ }),
 /* 799 */,
-/* 800 */,
-/* 801 */,
+/* 800 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var castPath = __webpack_require__(929),
+    isArguments = __webpack_require__(460),
+    isArray = __webpack_require__(143),
+    isIndex = __webpack_require__(160),
+    isLength = __webpack_require__(611),
+    toKey = __webpack_require__(503);
+
+/**
+ * Checks if `path` exists on `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {Array|string} path The path to check.
+ * @param {Function} hasFunc The function to check properties.
+ * @returns {boolean} Returns `true` if `path` exists, else `false`.
+ */
+function hasPath(object, path, hasFunc) {
+  path = castPath(path, object);
+
+  var index = -1,
+      length = path.length,
+      result = false;
+
+  while (++index < length) {
+    var key = toKey(path[index]);
+    if (!(result = object != null && hasFunc(object, key))) {
+      break;
+    }
+    object = object[key];
+  }
+  if (result || ++index != length) {
+    return result;
+  }
+  length = object == null ? 0 : object.length;
+  return !!length && isLength(length) && isIndex(key, length) &&
+    (isArray(object) || isArguments(object));
+}
+
+module.exports = hasPath;
+
+
+/***/ }),
+/* 801 */
+/***/ (function(module) {
+
+/**
+ * The default argument placeholder value for methods.
+ *
+ * @type {Object}
+ */
+module.exports = {};
+
+
+/***/ }),
 /* 802 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -23917,7 +27842,30 @@ module.exports = assocIndexOf;
 
 /***/ }),
 /* 821 */,
-/* 822 */,
+/* 822 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseConvert = __webpack_require__(71),
+    util = __webpack_require__(798);
+
+/**
+ * Converts `func` of `name` to an immutable auto-curried iteratee-first data-last
+ * version with conversion `options` applied. If `name` is an object its methods
+ * will be converted.
+ *
+ * @param {string} name The name of the function to wrap.
+ * @param {Function} [func] The function to wrap.
+ * @param {Object} [options] The options object. See `baseConvert` for more details.
+ * @returns {Function|Object} Returns the converted function or object.
+ */
+function convert(name, func, options) {
+  return baseConvert(util, name, func, options);
+}
+
+module.exports = convert;
+
+
+/***/ }),
 /* 823 */,
 /* 824 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -23956,9 +27904,9 @@ function locate(value, fromIndex) {
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var SetCache = __webpack_require__(405),
-    arrayIncludes = __webpack_require__(887),
+    arrayIncludes = __webpack_require__(751),
     arrayIncludesWith = __webpack_require__(655),
-    arrayMap = __webpack_require__(727),
+    arrayMap = __webpack_require__(766),
     baseUnary = __webpack_require__(231),
     cacheHas = __webpack_require__(275);
 
@@ -24032,7 +27980,28 @@ module.exports = baseIntersection;
 
 
 /***/ }),
-/* 831 */,
+/* 831 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var cloneArrayBuffer = __webpack_require__(600);
+
+/**
+ * Creates a clone of `typedArray`.
+ *
+ * @private
+ * @param {Object} typedArray The typed array to clone.
+ * @param {boolean} [isDeep] Specify a deep clone.
+ * @returns {Object} Returns the cloned typed array.
+ */
+function cloneTypedArray(typedArray, isDeep) {
+  var buffer = isDeep ? cloneArrayBuffer(typedArray.buffer) : typedArray.buffer;
+  return new typedArray.constructor(buffer, typedArray.byteOffset, typedArray.length);
+}
+
+module.exports = cloneTypedArray;
+
+
+/***/ }),
 /* 832 */,
 /* 833 */,
 /* 834 */,
@@ -24049,13 +28018,13 @@ module.exports = require("url");
 /* 840 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var Stack = __webpack_require__(598),
+var Stack = __webpack_require__(214),
     equalArrays = __webpack_require__(90),
     equalByTag = __webpack_require__(74),
     equalObjects = __webpack_require__(586),
     getTag = __webpack_require__(700),
     isArray = __webpack_require__(143),
-    isBuffer = __webpack_require__(408),
+    isBuffer = __webpack_require__(150),
     isTypedArray = __webpack_require__(850);
 
 /** Used to compose bitmasks for value comparisons. */
@@ -26036,15 +30005,190 @@ exports.restEndpointMethods = restEndpointMethods;
 
 /***/ }),
 /* 843 */,
-/* 844 */,
+/* 844 */
+/***/ (function(module) {
+
+/**
+ * Removes `key` and its value from the stack.
+ *
+ * @private
+ * @name delete
+ * @memberOf Stack
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ */
+function stackDelete(key) {
+  var data = this.__data__,
+      result = data['delete'](key);
+
+  this.size = data.size;
+  return result;
+}
+
+module.exports = stackDelete;
+
+
+/***/ }),
 /* 845 */,
 /* 846 */,
-/* 847 */,
+/* 847 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var LazyWrapper = __webpack_require__(37),
+    LodashWrapper = __webpack_require__(58),
+    baseLodash = __webpack_require__(681),
+    isArray = __webpack_require__(143),
+    isObjectLike = __webpack_require__(337),
+    wrapperClone = __webpack_require__(520);
+
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Creates a `lodash` object which wraps `value` to enable implicit method
+ * chain sequences. Methods that operate on and return arrays, collections,
+ * and functions can be chained together. Methods that retrieve a single value
+ * or may return a primitive value will automatically end the chain sequence
+ * and return the unwrapped value. Otherwise, the value must be unwrapped
+ * with `_#value`.
+ *
+ * Explicit chain sequences, which must be unwrapped with `_#value`, may be
+ * enabled using `_.chain`.
+ *
+ * The execution of chained methods is lazy, that is, it's deferred until
+ * `_#value` is implicitly or explicitly called.
+ *
+ * Lazy evaluation allows several methods to support shortcut fusion.
+ * Shortcut fusion is an optimization to merge iteratee calls; this avoids
+ * the creation of intermediate arrays and can greatly reduce the number of
+ * iteratee executions. Sections of a chain sequence qualify for shortcut
+ * fusion if the section is applied to an array and iteratees accept only
+ * one argument. The heuristic for whether a section qualifies for shortcut
+ * fusion is subject to change.
+ *
+ * Chaining is supported in custom builds as long as the `_#value` method is
+ * directly or indirectly included in the build.
+ *
+ * In addition to lodash methods, wrappers have `Array` and `String` methods.
+ *
+ * The wrapper `Array` methods are:
+ * `concat`, `join`, `pop`, `push`, `shift`, `sort`, `splice`, and `unshift`
+ *
+ * The wrapper `String` methods are:
+ * `replace` and `split`
+ *
+ * The wrapper methods that support shortcut fusion are:
+ * `at`, `compact`, `drop`, `dropRight`, `dropWhile`, `filter`, `find`,
+ * `findLast`, `head`, `initial`, `last`, `map`, `reject`, `reverse`, `slice`,
+ * `tail`, `take`, `takeRight`, `takeRightWhile`, `takeWhile`, and `toArray`
+ *
+ * The chainable wrapper methods are:
+ * `after`, `ary`, `assign`, `assignIn`, `assignInWith`, `assignWith`, `at`,
+ * `before`, `bind`, `bindAll`, `bindKey`, `castArray`, `chain`, `chunk`,
+ * `commit`, `compact`, `concat`, `conforms`, `constant`, `countBy`, `create`,
+ * `curry`, `debounce`, `defaults`, `defaultsDeep`, `defer`, `delay`,
+ * `difference`, `differenceBy`, `differenceWith`, `drop`, `dropRight`,
+ * `dropRightWhile`, `dropWhile`, `extend`, `extendWith`, `fill`, `filter`,
+ * `flatMap`, `flatMapDeep`, `flatMapDepth`, `flatten`, `flattenDeep`,
+ * `flattenDepth`, `flip`, `flow`, `flowRight`, `fromPairs`, `functions`,
+ * `functionsIn`, `groupBy`, `initial`, `intersection`, `intersectionBy`,
+ * `intersectionWith`, `invert`, `invertBy`, `invokeMap`, `iteratee`, `keyBy`,
+ * `keys`, `keysIn`, `map`, `mapKeys`, `mapValues`, `matches`, `matchesProperty`,
+ * `memoize`, `merge`, `mergeWith`, `method`, `methodOf`, `mixin`, `negate`,
+ * `nthArg`, `omit`, `omitBy`, `once`, `orderBy`, `over`, `overArgs`,
+ * `overEvery`, `overSome`, `partial`, `partialRight`, `partition`, `pick`,
+ * `pickBy`, `plant`, `property`, `propertyOf`, `pull`, `pullAll`, `pullAllBy`,
+ * `pullAllWith`, `pullAt`, `push`, `range`, `rangeRight`, `rearg`, `reject`,
+ * `remove`, `rest`, `reverse`, `sampleSize`, `set`, `setWith`, `shuffle`,
+ * `slice`, `sort`, `sortBy`, `splice`, `spread`, `tail`, `take`, `takeRight`,
+ * `takeRightWhile`, `takeWhile`, `tap`, `throttle`, `thru`, `toArray`,
+ * `toPairs`, `toPairsIn`, `toPath`, `toPlainObject`, `transform`, `unary`,
+ * `union`, `unionBy`, `unionWith`, `uniq`, `uniqBy`, `uniqWith`, `unset`,
+ * `unshift`, `unzip`, `unzipWith`, `update`, `updateWith`, `values`,
+ * `valuesIn`, `without`, `wrap`, `xor`, `xorBy`, `xorWith`, `zip`,
+ * `zipObject`, `zipObjectDeep`, and `zipWith`
+ *
+ * The wrapper methods that are **not** chainable by default are:
+ * `add`, `attempt`, `camelCase`, `capitalize`, `ceil`, `clamp`, `clone`,
+ * `cloneDeep`, `cloneDeepWith`, `cloneWith`, `conformsTo`, `deburr`,
+ * `defaultTo`, `divide`, `each`, `eachRight`, `endsWith`, `eq`, `escape`,
+ * `escapeRegExp`, `every`, `find`, `findIndex`, `findKey`, `findLast`,
+ * `findLastIndex`, `findLastKey`, `first`, `floor`, `forEach`, `forEachRight`,
+ * `forIn`, `forInRight`, `forOwn`, `forOwnRight`, `get`, `gt`, `gte`, `has`,
+ * `hasIn`, `head`, `identity`, `includes`, `indexOf`, `inRange`, `invoke`,
+ * `isArguments`, `isArray`, `isArrayBuffer`, `isArrayLike`, `isArrayLikeObject`,
+ * `isBoolean`, `isBuffer`, `isDate`, `isElement`, `isEmpty`, `isEqual`,
+ * `isEqualWith`, `isError`, `isFinite`, `isFunction`, `isInteger`, `isLength`,
+ * `isMap`, `isMatch`, `isMatchWith`, `isNaN`, `isNative`, `isNil`, `isNull`,
+ * `isNumber`, `isObject`, `isObjectLike`, `isPlainObject`, `isRegExp`,
+ * `isSafeInteger`, `isSet`, `isString`, `isUndefined`, `isTypedArray`,
+ * `isWeakMap`, `isWeakSet`, `join`, `kebabCase`, `last`, `lastIndexOf`,
+ * `lowerCase`, `lowerFirst`, `lt`, `lte`, `max`, `maxBy`, `mean`, `meanBy`,
+ * `min`, `minBy`, `multiply`, `noConflict`, `noop`, `now`, `nth`, `pad`,
+ * `padEnd`, `padStart`, `parseInt`, `pop`, `random`, `reduce`, `reduceRight`,
+ * `repeat`, `result`, `round`, `runInContext`, `sample`, `shift`, `size`,
+ * `snakeCase`, `some`, `sortedIndex`, `sortedIndexBy`, `sortedLastIndex`,
+ * `sortedLastIndexBy`, `startCase`, `startsWith`, `stubArray`, `stubFalse`,
+ * `stubObject`, `stubString`, `stubTrue`, `subtract`, `sum`, `sumBy`,
+ * `template`, `times`, `toFinite`, `toInteger`, `toJSON`, `toLength`,
+ * `toLower`, `toNumber`, `toSafeInteger`, `toString`, `toUpper`, `trim`,
+ * `trimEnd`, `trimStart`, `truncate`, `unescape`, `uniqueId`, `upperCase`,
+ * `upperFirst`, `value`, and `words`
+ *
+ * @name _
+ * @constructor
+ * @category Seq
+ * @param {*} value The value to wrap in a `lodash` instance.
+ * @returns {Object} Returns the new `lodash` wrapper instance.
+ * @example
+ *
+ * function square(n) {
+ *   return n * n;
+ * }
+ *
+ * var wrapped = _([1, 2, 3]);
+ *
+ * // Returns an unwrapped value.
+ * wrapped.reduce(_.add);
+ * // => 6
+ *
+ * // Returns a wrapped value.
+ * var squares = wrapped.map(square);
+ *
+ * _.isArray(squares);
+ * // => false
+ *
+ * _.isArray(squares.value());
+ * // => true
+ */
+function lodash(value) {
+  if (isObjectLike(value) && !isArray(value) && !(value instanceof LazyWrapper)) {
+    if (value instanceof LodashWrapper) {
+      return value;
+    }
+    if (hasOwnProperty.call(value, '__wrapped__')) {
+      return wrapperClone(value);
+    }
+  }
+  return new LodashWrapper(value);
+}
+
+// Ensure wrappers are instances of `baseLodash`.
+lodash.prototype = baseLodash.prototype;
+lodash.prototype.constructor = lodash;
+
+module.exports = lodash;
+
+
+/***/ }),
 /* 848 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var baseClone = __webpack_require__(377),
-    baseIteratee = __webpack_require__(354);
+    baseIteratee = __webpack_require__(776);
 
 /** Used to compose bitmasks for cloning. */
 var CLONE_DEEP_FLAG = 1;
@@ -26105,101 +30249,66 @@ module.exports = iteratee;
 "use strict";
 
 
-var repeat = __webpack_require__(8)
-var trim = __webpack_require__(932)
+const u = __webpack_require__(676).fromCallback
+const path = __webpack_require__(622)
+const fs = __webpack_require__(598)
+const _mkdirs = __webpack_require__(727)
+const mkdirs = _mkdirs.mkdirs
+const mkdirsSync = _mkdirs.mkdirsSync
 
-module.exports = indentedCode
+const _symlinkPaths = __webpack_require__(930)
+const symlinkPaths = _symlinkPaths.symlinkPaths
+const symlinkPathsSync = _symlinkPaths.symlinkPathsSync
 
-var lineFeed = '\n'
-var tab = '\t'
-var space = ' '
+const _symlinkType = __webpack_require__(975)
+const symlinkType = _symlinkType.symlinkType
+const symlinkTypeSync = _symlinkType.symlinkTypeSync
 
-var tabSize = 4
-var codeIndent = repeat(space, tabSize)
+const pathExists = __webpack_require__(322).pathExists
 
-function indentedCode(eat, value, silent) {
-  var index = -1
-  var length = value.length
-  var subvalue = ''
-  var content = ''
-  var subvalueQueue = ''
-  var contentQueue = ''
-  var character
-  var blankQueue
-  var indent
+function createSymlink (srcpath, dstpath, type, callback) {
+  callback = (typeof type === 'function') ? type : callback
+  type = (typeof type === 'function') ? false : type
 
-  while (++index < length) {
-    character = value.charAt(index)
-
-    if (indent) {
-      indent = false
-
-      subvalue += subvalueQueue
-      content += contentQueue
-      subvalueQueue = ''
-      contentQueue = ''
-
-      if (character === lineFeed) {
-        subvalueQueue = character
-        contentQueue = character
-      } else {
-        subvalue += character
-        content += character
-
-        while (++index < length) {
-          character = value.charAt(index)
-
-          if (!character || character === lineFeed) {
-            contentQueue = character
-            subvalueQueue = character
-            break
-          }
-
-          subvalue += character
-          content += character
-        }
-      }
-    } else if (
-      character === space &&
-      value.charAt(index + 1) === character &&
-      value.charAt(index + 2) === character &&
-      value.charAt(index + 3) === character
-    ) {
-      subvalueQueue += codeIndent
-      index += 3
-      indent = true
-    } else if (character === tab) {
-      subvalueQueue += character
-      indent = true
-    } else {
-      blankQueue = ''
-
-      while (character === tab || character === space) {
-        blankQueue += character
-        character = value.charAt(++index)
-      }
-
-      if (character !== lineFeed) {
-        break
-      }
-
-      subvalueQueue += blankQueue + character
-      contentQueue += character
-    }
-  }
-
-  if (content) {
-    if (silent) {
-      return true
-    }
-
-    return eat(subvalue)({
-      type: 'code',
-      lang: null,
-      meta: null,
-      value: trim(content)
+  pathExists(dstpath, (err, destinationExists) => {
+    if (err) return callback(err)
+    if (destinationExists) return callback(null)
+    symlinkPaths(srcpath, dstpath, (err, relative) => {
+      if (err) return callback(err)
+      srcpath = relative.toDst
+      symlinkType(relative.toCwd, type, (err, type) => {
+        if (err) return callback(err)
+        const dir = path.dirname(dstpath)
+        pathExists(dir, (err, dirExists) => {
+          if (err) return callback(err)
+          if (dirExists) return fs.symlink(srcpath, dstpath, type, callback)
+          mkdirs(dir, err => {
+            if (err) return callback(err)
+            fs.symlink(srcpath, dstpath, type, callback)
+          })
+        })
+      })
     })
-  }
+  })
+}
+
+function createSymlinkSync (srcpath, dstpath, type) {
+  const destinationExists = fs.existsSync(dstpath)
+  if (destinationExists) return undefined
+
+  const relative = symlinkPathsSync(srcpath, dstpath)
+  srcpath = relative.toDst
+  type = symlinkTypeSync(relative.toCwd, type)
+  const dir = path.dirname(dstpath)
+  const exists = fs.existsSync(dir)
+  if (exists) return fs.symlinkSync(srcpath, dstpath, type)
+  mkdirsSync(dir)
+  return fs.symlinkSync(srcpath, dstpath, type)
+}
+
+module.exports = {
+  createSymlink: u(createSymlink),
+  createSymlinkSync
 }
 
 
@@ -26209,7 +30318,7 @@ function indentedCode(eat, value, silent) {
 
 var baseIsTypedArray = __webpack_require__(412),
     baseUnary = __webpack_require__(231),
-    nodeUtil = __webpack_require__(616);
+    nodeUtil = __webpack_require__(138);
 
 /* Node.js helper references. */
 var nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
@@ -26320,56 +30429,70 @@ function interrupt(interruptors, tokenizers, ctx, parameters) {
 
 /***/ }),
 /* 854 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var baseSetData = __webpack_require__(146),
-    shortOut = __webpack_require__(906);
+"use strict";
 
-/**
- * Sets metadata for `func`.
- *
- * **Note:** If this function becomes hot, i.e. is invoked a lot in a short
- * period of time, it will trip its breaker and transition to an identity
- * function to avoid garbage collection pauses in V8. See
- * [V8 issue 2070](https://bugs.chromium.org/p/v8/issues/detail?id=2070)
- * for more details.
- *
- * @private
- * @param {Function} func The function to associate metadata with.
- * @param {*} data The metadata.
- * @returns {Function} Returns `func`.
- */
-var setData = shortOut(baseSetData);
 
-module.exports = setData;
+module.exports = tableCell
+
+var lineFeed = /\r?\n/g
+
+function tableCell(node) {
+  return this.all(node).join('').replace(lineFeed, ' ')
+}
 
 
 /***/ }),
-/* 855 */,
+/* 855 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var arrayMap = __webpack_require__(766),
+    copyArray = __webpack_require__(239),
+    isArray = __webpack_require__(143),
+    isSymbol = __webpack_require__(186),
+    stringToPath = __webpack_require__(613),
+    toKey = __webpack_require__(503),
+    toString = __webpack_require__(428);
+
+/**
+ * Converts `value` to a property path array.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Util
+ * @param {*} value The value to convert.
+ * @returns {Array} Returns the new property path array.
+ * @example
+ *
+ * _.toPath('a.b.c');
+ * // => ['a', 'b', 'c']
+ *
+ * _.toPath('a[0].b.c');
+ * // => ['a', '0', 'b', 'c']
+ */
+function toPath(value) {
+  if (isArray(value)) {
+    return arrayMap(value, toKey);
+  }
+  return isSymbol(value) ? [value] : copyArray(stringToPath(toString(value)));
+}
+
+module.exports = toPath;
+
+
+/***/ }),
 /* 856 */,
 /* 857 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var arrayPush = __webpack_require__(883),
-    isArray = __webpack_require__(143);
+var overArg = __webpack_require__(393);
 
-/**
- * The base implementation of `getAllKeys` and `getAllKeysIn` which uses
- * `keysFunc` and `symbolsFunc` to get the enumerable property names and
- * symbols of `object`.
- *
- * @private
- * @param {Object} object The object to query.
- * @param {Function} keysFunc The function to get the keys of `object`.
- * @param {Function} symbolsFunc The function to get the symbols of `object`.
- * @returns {Array} Returns the array of property names and symbols.
- */
-function baseGetAllKeys(object, keysFunc, symbolsFunc) {
-  var result = keysFunc(object);
-  return isArray(object) ? result : arrayPush(result, symbolsFunc(object));
-}
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeKeys = overArg(Object.keys, Object);
 
-module.exports = baseGetAllKeys;
+module.exports = nativeKeys;
 
 
 /***/ }),
@@ -26400,9 +30523,9 @@ exports.right = function(str){
 /* 863 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var arrayLikeKeys = __webpack_require__(149),
+var arrayLikeKeys = __webpack_require__(549),
     baseKeys = __webpack_require__(351),
-    isArrayLike = __webpack_require__(192);
+    isArrayLike = __webpack_require__(146);
 
 /**
  * Creates an array of the own enumerable property names of `object`.
@@ -26483,71 +30606,154 @@ module.exports = function (str) {
 /* 867 */,
 /* 868 */,
 /* 869 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-var apply = __webpack_require__(512),
-    createCtor = __webpack_require__(546),
-    root = __webpack_require__(824);
+"use strict";
 
-/** Used to compose bitmasks for function metadata. */
-var WRAP_BIND_FLAG = 1;
+// This is adapted from https://github.com/normalize/mz
+// Copyright (c) 2014-2016 Jonathan Ong me@jongleberry.com and Contributors
+const u = __webpack_require__(676).fromCallback
+const fs = __webpack_require__(598)
 
-/**
- * Creates a function that wraps `func` to invoke it with the `this` binding
- * of `thisArg` and `partials` prepended to the arguments it receives.
- *
- * @private
- * @param {Function} func The function to wrap.
- * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
- * @param {*} thisArg The `this` binding of `func`.
- * @param {Array} partials The arguments to prepend to those provided to
- *  the new function.
- * @returns {Function} Returns the new wrapped function.
- */
-function createPartial(func, bitmask, thisArg, partials) {
-  var isBind = bitmask & WRAP_BIND_FLAG,
-      Ctor = createCtor(func);
+const api = [
+  'access',
+  'appendFile',
+  'chmod',
+  'chown',
+  'close',
+  'copyFile',
+  'fchmod',
+  'fchown',
+  'fdatasync',
+  'fstat',
+  'fsync',
+  'ftruncate',
+  'futimes',
+  'lchmod',
+  'lchown',
+  'link',
+  'lstat',
+  'mkdir',
+  'mkdtemp',
+  'open',
+  'opendir',
+  'readdir',
+  'readFile',
+  'readlink',
+  'realpath',
+  'rename',
+  'rmdir',
+  'stat',
+  'symlink',
+  'truncate',
+  'unlink',
+  'utimes',
+  'writeFile'
+].filter(key => {
+  // Some commands are not available on some systems. Ex:
+  // fs.opendir was added in Node.js v12.12.0
+  // fs.lchown is not available on at least some Linux
+  return typeof fs[key] === 'function'
+})
 
-  function wrapper() {
-    var argsIndex = -1,
-        argsLength = arguments.length,
-        leftIndex = -1,
-        leftLength = partials.length,
-        args = Array(leftLength + argsLength),
-        fn = (this && this !== root && this instanceof wrapper) ? Ctor : func;
-
-    while (++leftIndex < leftLength) {
-      args[leftIndex] = partials[leftIndex];
-    }
-    while (argsLength--) {
-      args[leftIndex++] = arguments[++argsIndex];
-    }
-    return apply(fn, isBind ? thisArg : this, args);
+// Export all keys:
+Object.keys(fs).forEach(key => {
+  if (key === 'promises') {
+    // fs.promises is a getter property that triggers ExperimentalWarning
+    // Don't re-export it here, the getter is defined in "lib/index.js"
+    return
   }
-  return wrapper;
+  exports[key] = fs[key]
+})
+
+// Universalify async methods:
+api.forEach(method => {
+  exports[method] = u(fs[method])
+})
+
+// We differ from mz/fs in that we still ship the old, broken, fs.exists()
+// since we are a drop-in replacement for the native module
+exports.exists = function (filename, callback) {
+  if (typeof callback === 'function') {
+    return fs.exists(filename, callback)
+  }
+  return new Promise(resolve => {
+    return fs.exists(filename, resolve)
+  })
 }
 
-module.exports = createPartial;
+// fs.read(), fs.write(), & fs.writev() need special treatment due to multiple callback args
+
+exports.read = function (fd, buffer, offset, length, position, callback) {
+  if (typeof callback === 'function') {
+    return fs.read(fd, buffer, offset, length, position, callback)
+  }
+  return new Promise((resolve, reject) => {
+    fs.read(fd, buffer, offset, length, position, (err, bytesRead, buffer) => {
+      if (err) return reject(err)
+      resolve({ bytesRead, buffer })
+    })
+  })
+}
+
+// Function signature can be
+// fs.write(fd, buffer[, offset[, length[, position]]], callback)
+// OR
+// fs.write(fd, string[, position[, encoding]], callback)
+// We need to handle both cases, so we use ...args
+exports.write = function (fd, buffer, ...args) {
+  if (typeof args[args.length - 1] === 'function') {
+    return fs.write(fd, buffer, ...args)
+  }
+
+  return new Promise((resolve, reject) => {
+    fs.write(fd, buffer, ...args, (err, bytesWritten, buffer) => {
+      if (err) return reject(err)
+      resolve({ bytesWritten, buffer })
+    })
+  })
+}
+
+// fs.writev only available in Node v12.9.0+
+if (typeof fs.writev === 'function') {
+  // Function signature is
+  // s.writev(fd, buffers[, position], callback)
+  // We need to handle the optional arg, so we use ...args
+  exports.writev = function (fd, buffers, ...args) {
+    if (typeof args[args.length - 1] === 'function') {
+      return fs.writev(fd, buffers, ...args)
+    }
+
+    return new Promise((resolve, reject) => {
+      fs.writev(fd, buffers, ...args, (err, bytesWritten, buffers) => {
+        if (err) return reject(err)
+        resolve({ bytesWritten, buffers })
+      })
+    })
+  }
+}
+
+// fs.realpath.native only available in Node v9.2+
+if (typeof fs.realpath.native === 'function') {
+  exports.realpath.native = u(fs.realpath.native)
+}
 
 
 /***/ }),
 /* 870 */
 /***/ (function(module) {
 
-/**
- * Gets the stack value for `key`.
+/*!
+ * Determine if an object is a Buffer
  *
- * @private
- * @name get
- * @memberOf Stack
- * @param {string} key The key of the value to get.
- * @returns {*} Returns the entry value.
+ * @author   Feross Aboukhadijeh <https://feross.org>
+ * @license  MIT
  */
-function stackGet(key) {
-  return this.__data__.get(key);
-}
 
-module.exports = stackGet;
+module.exports = function isBuffer (obj) {
+  return obj != null && obj.constructor != null &&
+    typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
 
 
 /***/ }),
@@ -26593,46 +30799,25 @@ function visit(tree, test, visitor, reverse) {
 /* 875 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var assignValue = __webpack_require__(691),
-    baseAssignValue = __webpack_require__(772);
+"use strict";
 
-/**
- * Copies properties of `source` to `object`.
- *
- * @private
- * @param {Object} source The object to copy properties from.
- * @param {Array} props The property identifiers to copy.
- * @param {Object} [object={}] The object to copy properties to.
- * @param {Function} [customizer] The function to customize copied values.
- * @returns {Object} Returns `object`.
- */
-function copyObject(source, props, object, customizer) {
-  var isNew = !object;
-  object || (object = {});
 
-  var index = -1,
-      length = props.length;
+var repeat = __webpack_require__(8)
 
-  while (++index < length) {
-    var key = props[index];
+module.exports = strong
 
-    var newValue = customizer
-      ? customizer(object[key], source[key], key, object, source)
-      : undefined;
-
-    if (newValue === undefined) {
-      newValue = source[key];
-    }
-    if (isNew) {
-      baseAssignValue(object, key, newValue);
-    } else {
-      assignValue(object, key, newValue);
-    }
-  }
-  return object;
+// Stringify a `strong`.
+//
+// The marker used is configurable by `strong`, which defaults to an asterisk
+// (`'*'`) but also accepts an underscore (`'_'`):
+//
+// ```markdown
+// __foo__
+// ```
+function strong(node) {
+  var marker = repeat(this.options.strong, 2)
+  return marker + this.all(node).join('') + marker
 }
-
-module.exports = copyObject;
 
 
 /***/ }),
@@ -27305,29 +31490,7 @@ function mergeBlockquote(previous, node) {
 
 
 /***/ }),
-/* 887 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var baseIndexOf = __webpack_require__(571);
-
-/**
- * A specialized version of `_.includes` for arrays without support for
- * specifying an index to search from.
- *
- * @private
- * @param {Array} [array] The array to inspect.
- * @param {*} target The value to search for.
- * @returns {boolean} Returns `true` if `target` is found, else `false`.
- */
-function arrayIncludes(array, value) {
-  var length = array == null ? 0 : array.length;
-  return !!length && baseIndexOf(array, value, 0) > -1;
-}
-
-module.exports = arrayIncludes;
-
-
-/***/ }),
+/* 887 */,
 /* 888 */,
 /* 889 */,
 /* 890 */,
@@ -27450,7 +31613,74 @@ exports.withCustomRequest = withCustomRequest;
 
 /***/ }),
 /* 899 */,
-/* 900 */,
+/* 900 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const u = __webpack_require__(676).fromCallback
+const path = __webpack_require__(622)
+const fs = __webpack_require__(598)
+const mkdir = __webpack_require__(727)
+const pathExists = __webpack_require__(322).pathExists
+
+function createLink (srcpath, dstpath, callback) {
+  function makeLink (srcpath, dstpath) {
+    fs.link(srcpath, dstpath, err => {
+      if (err) return callback(err)
+      callback(null)
+    })
+  }
+
+  pathExists(dstpath, (err, destinationExists) => {
+    if (err) return callback(err)
+    if (destinationExists) return callback(null)
+    fs.lstat(srcpath, (err) => {
+      if (err) {
+        err.message = err.message.replace('lstat', 'ensureLink')
+        return callback(err)
+      }
+
+      const dir = path.dirname(dstpath)
+      pathExists(dir, (err, dirExists) => {
+        if (err) return callback(err)
+        if (dirExists) return makeLink(srcpath, dstpath)
+        mkdir.mkdirs(dir, err => {
+          if (err) return callback(err)
+          makeLink(srcpath, dstpath)
+        })
+      })
+    })
+  })
+}
+
+function createLinkSync (srcpath, dstpath) {
+  const destinationExists = fs.existsSync(dstpath)
+  if (destinationExists) return undefined
+
+  try {
+    fs.lstatSync(srcpath)
+  } catch (err) {
+    err.message = err.message.replace('lstat', 'ensureLink')
+    throw err
+  }
+
+  const dir = path.dirname(dstpath)
+  const dirExists = fs.existsSync(dir)
+  if (dirExists) return fs.linkSync(srcpath, dstpath)
+  mkdir.mkdirsSync(dir)
+
+  return fs.linkSync(srcpath, dstpath)
+}
+
+module.exports = {
+  createLink: u(createLink),
+  createLinkSync
+}
+
+
+/***/ }),
 /* 901 */,
 /* 902 */
 /***/ (function(module) {
@@ -27487,45 +31717,43 @@ module.exports = listCacheHas;
 /* 904 */,
 /* 905 */,
 /* 906 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/** Used to detect hot functions by number of calls within a span of milliseconds. */
-var HOT_COUNT = 800,
-    HOT_SPAN = 16;
+var assocIndexOf = __webpack_require__(820);
 
-/* Built-in method references for those with the same name as other `lodash` methods. */
-var nativeNow = Date.now;
+/** Used for built-in method references. */
+var arrayProto = Array.prototype;
+
+/** Built-in value references. */
+var splice = arrayProto.splice;
 
 /**
- * Creates a function that'll short out and invoke `identity` instead
- * of `func` when it's called `HOT_COUNT` or more times in `HOT_SPAN`
- * milliseconds.
+ * Removes `key` and its value from the list cache.
  *
  * @private
- * @param {Function} func The function to restrict.
- * @returns {Function} Returns the new shortable function.
+ * @name delete
+ * @memberOf ListCache
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
  */
-function shortOut(func) {
-  var count = 0,
-      lastCalled = 0;
+function listCacheDelete(key) {
+  var data = this.__data__,
+      index = assocIndexOf(data, key);
 
-  return function() {
-    var stamp = nativeNow(),
-        remaining = HOT_SPAN - (stamp - lastCalled);
-
-    lastCalled = stamp;
-    if (remaining > 0) {
-      if (++count >= HOT_COUNT) {
-        return arguments[0];
-      }
-    } else {
-      count = 0;
-    }
-    return func.apply(undefined, arguments);
-  };
+  if (index < 0) {
+    return false;
+  }
+  var lastIndex = data.length - 1;
+  if (index == lastIndex) {
+    data.pop();
+  } else {
+    splice.call(data, index, 1);
+  }
+  --this.size;
+  return true;
 }
 
-module.exports = shortOut;
+module.exports = listCacheDelete;
 
 
 /***/ }),
@@ -27566,7 +31794,7 @@ module.exports = insertWrapDetails;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var flatten = __webpack_require__(938),
-    overRest = __webpack_require__(588),
+    overRest = __webpack_require__(430),
     setToString = __webpack_require__(70);
 
 /**
@@ -27587,7 +31815,39 @@ module.exports = flatRest;
 /* 913 */,
 /* 914 */,
 /* 915 */,
-/* 916 */,
+/* 916 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const fs = __webpack_require__(598)
+
+function utimesMillis (path, atime, mtime, callback) {
+  // if (!HAS_MILLIS_RES) return fs.utimes(path, atime, mtime, callback)
+  fs.open(path, 'r+', (err, fd) => {
+    if (err) return callback(err)
+    fs.futimes(fd, atime, mtime, futimesErr => {
+      fs.close(fd, closeErr => {
+        if (callback) callback(futimesErr || closeErr)
+      })
+    })
+  })
+}
+
+function utimesMillisSync (path, atime, mtime) {
+  const fd = fs.openSync(path, 'r+')
+  fs.futimesSync(fd, atime, mtime)
+  return fs.closeSync(fd)
+}
+
+module.exports = {
+  utimesMillis,
+  utimesMillisSync
+}
+
+
+/***/ }),
 /* 917 */,
 /* 918 */,
 /* 919 */,
@@ -27642,7 +31902,7 @@ function decimal(character) {
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var baseProperty = __webpack_require__(509),
-    basePropertyDeep = __webpack_require__(352),
+    basePropertyDeep = __webpack_require__(579),
     isKey = __webpack_require__(748),
     toKey = __webpack_require__(503);
 
@@ -27703,7 +31963,7 @@ function hexadecimal(character) {
 
 var isArray = __webpack_require__(143),
     isKey = __webpack_require__(748),
-    stringToPath = __webpack_require__(440),
+    stringToPath = __webpack_require__(613),
     toString = __webpack_require__(428);
 
 /**
@@ -27728,39 +31988,106 @@ module.exports = castPath;
 /* 930 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var createWrap = __webpack_require__(227),
-    flatRest = __webpack_require__(912);
+"use strict";
 
-/** Used to compose bitmasks for function metadata. */
-var WRAP_REARG_FLAG = 256;
+
+const path = __webpack_require__(622)
+const fs = __webpack_require__(598)
+const pathExists = __webpack_require__(322).pathExists
 
 /**
- * Creates a function that invokes `func` with arguments arranged according
- * to the specified `indexes` where the argument value at the first index is
- * provided as the first argument, the argument value at the second index is
- * provided as the second argument, and so on.
- *
- * @static
- * @memberOf _
- * @since 3.0.0
- * @category Function
- * @param {Function} func The function to rearrange arguments for.
- * @param {...(number|number[])} indexes The arranged argument indexes.
- * @returns {Function} Returns the new function.
- * @example
- *
- * var rearged = _.rearg(function(a, b, c) {
- *   return [a, b, c];
- * }, [2, 0, 1]);
- *
- * rearged('b', 'c', 'a')
- * // => ['a', 'b', 'c']
+ * Function that returns two types of paths, one relative to symlink, and one
+ * relative to the current working directory. Checks if path is absolute or
+ * relative. If the path is relative, this function checks if the path is
+ * relative to symlink or relative to current working directory. This is an
+ * initiative to find a smarter `srcpath` to supply when building symlinks.
+ * This allows you to determine which path to use out of one of three possible
+ * types of source paths. The first is an absolute path. This is detected by
+ * `path.isAbsolute()`. When an absolute path is provided, it is checked to
+ * see if it exists. If it does it's used, if not an error is returned
+ * (callback)/ thrown (sync). The other two options for `srcpath` are a
+ * relative url. By default Node's `fs.symlink` works by creating a symlink
+ * using `dstpath` and expects the `srcpath` to be relative to the newly
+ * created symlink. If you provide a `srcpath` that does not exist on the file
+ * system it results in a broken symlink. To minimize this, the function
+ * checks to see if the 'relative to symlink' source file exists, and if it
+ * does it will use it. If it does not, it checks if there's a file that
+ * exists that is relative to the current working directory, if does its used.
+ * This preserves the expectations of the original fs.symlink spec and adds
+ * the ability to pass in `relative to current working direcotry` paths.
  */
-var rearg = flatRest(function(func, indexes) {
-  return createWrap(func, WRAP_REARG_FLAG, undefined, undefined, undefined, indexes);
-});
 
-module.exports = rearg;
+function symlinkPaths (srcpath, dstpath, callback) {
+  if (path.isAbsolute(srcpath)) {
+    return fs.lstat(srcpath, (err) => {
+      if (err) {
+        err.message = err.message.replace('lstat', 'ensureSymlink')
+        return callback(err)
+      }
+      return callback(null, {
+        toCwd: srcpath,
+        toDst: srcpath
+      })
+    })
+  } else {
+    const dstdir = path.dirname(dstpath)
+    const relativeToDst = path.join(dstdir, srcpath)
+    return pathExists(relativeToDst, (err, exists) => {
+      if (err) return callback(err)
+      if (exists) {
+        return callback(null, {
+          toCwd: relativeToDst,
+          toDst: srcpath
+        })
+      } else {
+        return fs.lstat(srcpath, (err) => {
+          if (err) {
+            err.message = err.message.replace('lstat', 'ensureSymlink')
+            return callback(err)
+          }
+          return callback(null, {
+            toCwd: srcpath,
+            toDst: path.relative(dstdir, srcpath)
+          })
+        })
+      }
+    })
+  }
+}
+
+function symlinkPathsSync (srcpath, dstpath) {
+  let exists
+  if (path.isAbsolute(srcpath)) {
+    exists = fs.existsSync(srcpath)
+    if (!exists) throw new Error('absolute srcpath does not exist')
+    return {
+      toCwd: srcpath,
+      toDst: srcpath
+    }
+  } else {
+    const dstdir = path.dirname(dstpath)
+    const relativeToDst = path.join(dstdir, srcpath)
+    exists = fs.existsSync(relativeToDst)
+    if (exists) {
+      return {
+        toCwd: relativeToDst,
+        toDst: srcpath
+      }
+    } else {
+      exists = fs.existsSync(srcpath)
+      if (!exists) throw new Error('relative srcpath does not exist')
+      return {
+        toCwd: srcpath,
+        toDst: path.relative(dstdir, srcpath)
+      }
+    }
+  }
+}
+
+module.exports = {
+  symlinkPaths,
+  symlinkPathsSync
+}
 
 
 /***/ }),
@@ -28201,29 +32528,52 @@ exports.checkBypass = checkBypass;
 /* 953 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var LazyWrapper = __webpack_require__(37),
-    LodashWrapper = __webpack_require__(204),
-    copyArray = __webpack_require__(239);
+var apply = __webpack_require__(512),
+    createCtor = __webpack_require__(546),
+    createHybrid = __webpack_require__(720),
+    createRecurry = __webpack_require__(673),
+    getHolder = __webpack_require__(683),
+    replaceHolders = __webpack_require__(944),
+    root = __webpack_require__(824);
 
 /**
- * Creates a clone of `wrapper`.
+ * Creates a function that wraps `func` to enable currying.
  *
  * @private
- * @param {Object} wrapper The wrapper to clone.
- * @returns {Object} Returns the cloned wrapper.
+ * @param {Function} func The function to wrap.
+ * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
+ * @param {number} arity The arity of `func`.
+ * @returns {Function} Returns the new wrapped function.
  */
-function wrapperClone(wrapper) {
-  if (wrapper instanceof LazyWrapper) {
-    return wrapper.clone();
+function createCurry(func, bitmask, arity) {
+  var Ctor = createCtor(func);
+
+  function wrapper() {
+    var length = arguments.length,
+        args = Array(length),
+        index = length,
+        placeholder = getHolder(wrapper);
+
+    while (index--) {
+      args[index] = arguments[index];
+    }
+    var holders = (length < 3 && args[0] !== placeholder && args[length - 1] !== placeholder)
+      ? []
+      : replaceHolders(args, placeholder);
+
+    length -= holders.length;
+    if (length < arity) {
+      return createRecurry(
+        func, bitmask, createHybrid, wrapper.placeholder, undefined,
+        args, holders, undefined, undefined, arity - length);
+    }
+    var fn = (this && this !== root && this instanceof wrapper) ? Ctor : func;
+    return apply(fn, this, args);
   }
-  var result = new LodashWrapper(wrapper.__wrapped__, wrapper.__chain__);
-  result.__actions__ = copyArray(wrapper.__actions__);
-  result.__index__  = wrapper.__index__;
-  result.__values__ = wrapper.__values__;
-  return result;
+  return wrapper;
 }
 
-module.exports = wrapperClone;
+module.exports = createCurry;
 
 
 /***/ }),
@@ -28599,7 +32949,18 @@ module.exports.shellSync = (cmd, opts) => handleShell(module.exports.sync, cmd, 
 /* 956 */,
 /* 957 */,
 /* 958 */,
-/* 959 */,
+/* 959 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = {
+  moveSync: __webpack_require__(95)
+}
+
+
+/***/ }),
 /* 960 */,
 /* 961 */,
 /* 962 */,
@@ -28742,9 +33103,9 @@ function onceStrict (fn) {
 /* 971 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var arrayLikeKeys = __webpack_require__(149),
+var arrayLikeKeys = __webpack_require__(549),
     baseKeysIn = __webpack_require__(851),
-    isArrayLike = __webpack_require__(192);
+    isArrayLike = __webpack_require__(146);
 
 /**
  * Creates an array of the own and inherited enumerable property names of `object`.
@@ -28812,7 +33173,7 @@ module.exports = freeGlobal;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var baseIsMatch = __webpack_require__(255),
-    getMatchData = __webpack_require__(517),
+    getMatchData = __webpack_require__(109),
     matchesStrictComparable = __webpack_require__(416);
 
 /**
@@ -28836,7 +33197,44 @@ module.exports = baseMatches;
 
 
 /***/ }),
-/* 975 */,
+/* 975 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const fs = __webpack_require__(598)
+
+function symlinkType (srcpath, type, callback) {
+  callback = (typeof type === 'function') ? type : callback
+  type = (typeof type === 'function') ? false : type
+  if (type) return callback(null, type)
+  fs.lstat(srcpath, (err, stats) => {
+    if (err) return callback(null, 'file')
+    type = (stats && stats.isDirectory()) ? 'dir' : 'file'
+    callback(null, type)
+  })
+}
+
+function symlinkTypeSync (srcpath, type) {
+  let stats
+
+  if (type) return type
+  try {
+    stats = fs.lstatSync(srcpath)
+  } catch {
+    return 'file'
+  }
+  return (stats && stats.isDirectory()) ? 'dir' : 'file'
+}
+
+module.exports = {
+  symlinkType,
+  symlinkTypeSync
+}
+
+
+/***/ }),
 /* 976 */,
 /* 977 */,
 /* 978 */
@@ -28936,43 +33334,53 @@ module.exports = getRawTag;
 
 /***/ }),
 /* 986 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-var ListCache = __webpack_require__(670),
-    Map = __webpack_require__(864),
-    MapCache = __webpack_require__(978);
+"use strict";
 
-/** Used as the size to enable large array optimizations. */
-var LARGE_ARRAY_SIZE = 200;
-
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const tr = __importStar(__webpack_require__(686));
 /**
- * Sets the stack `key` to `value`.
+ * Exec a command.
+ * Output will be streamed to the live console.
+ * Returns promise with return code
  *
- * @private
- * @name set
- * @memberOf Stack
- * @param {string} key The key of the value to set.
- * @param {*} value The value to set.
- * @returns {Object} Returns the stack cache instance.
+ * @param     commandLine        command to execute (can include additional args). Must be correctly escaped.
+ * @param     args               optional arguments for tool. Escaping is handled by the lib.
+ * @param     options            optional exec options.  See ExecOptions
+ * @returns   Promise<number>    exit code
  */
-function stackSet(key, value) {
-  var data = this.__data__;
-  if (data instanceof ListCache) {
-    var pairs = data.__data__;
-    if (!Map || (pairs.length < LARGE_ARRAY_SIZE - 1)) {
-      pairs.push([key, value]);
-      this.size = ++data.size;
-      return this;
-    }
-    data = this.__data__ = new MapCache(pairs);
-  }
-  data.set(key, value);
-  this.size = data.size;
-  return this;
+function exec(commandLine, args, options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const commandArgs = tr.argStringToArray(commandLine);
+        if (commandArgs.length === 0) {
+            throw new Error(`Parameter 'commandLine' cannot be null or empty.`);
+        }
+        // Path to tool to execute should be first arg
+        const toolPath = commandArgs[0];
+        args = commandArgs.slice(1).concat(args || []);
+        const runner = new tr.ToolRunner(toolPath, args, options);
+        return runner.exec();
+    });
 }
-
-module.exports = stackSet;
-
+exports.exec = exec;
+//# sourceMappingURL=exec.js.map
 
 /***/ }),
 /* 987 */
@@ -29033,7 +33441,35 @@ module.exports = isObject;
 
 /***/ }),
 /* 989 */,
-/* 990 */,
+/* 990 */
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = blockquote
+
+var lineFeed = '\n'
+var space = ' '
+var greaterThan = '>'
+
+function blockquote(node) {
+  var values = this.block(node).split(lineFeed)
+  var result = []
+  var length = values.length
+  var index = -1
+  var value
+
+  while (++index < length) {
+    value = values[index]
+    result[index] = (value ? space : '') + value
+  }
+
+  return greaterThan + result.join(lineFeed + greaterThan)
+}
+
+
+/***/ }),
 /* 991 */
 /***/ (function(module) {
 
