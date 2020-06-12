@@ -12,18 +12,19 @@ const run = async (): Promise<void> => {
   } = github.context;
 
   const repoToken = core.getInput('repo-token', { required: true });
+  const event = action ? `${eventName}/${action}` : eventName;
 
-  core.info(`Received event: ${eventName}/${action}`);
+  core.info(`Received event: ${event}`);
 
   try {
-    if (eventName === 'push') {
+    if (event === 'push') {
       await processPush(repoToken);
-    } else if (eventName === 'issues' && action === 'opened') {
+    } else if (event === 'issues/opened') {
       await processIssueOpened(repoToken);
-    } else if (eventName === 'issue_comment' && action === 'created') {
+    } else if (event === 'issue_comment/created') {
       await processIssueCommentCreated(repoToken);
     } else {
-      core.warning(`no handler for ${eventName}/${action}`);
+      core.warning(`no handler for ${event}`);
     }
   } catch (e) {
     core.error(e);

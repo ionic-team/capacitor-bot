@@ -14137,19 +14137,20 @@ const created_1 = __importDefault(__webpack_require__(501));
 const run = async () => {
     const { eventName, payload: { action }, } = github.context;
     const repoToken = core.getInput('repo-token', { required: true });
-    core.info(`Received event: ${eventName}/${action}`);
+    const event = action ? `${eventName}/${action}` : eventName;
+    core.info(`Received event: ${event}`);
     try {
-        if (eventName === 'push') {
+        if (event === 'push') {
             await push_1.default(repoToken);
         }
-        else if (eventName === 'issues' && action === 'opened') {
+        else if (event === 'issues/opened') {
             await opened_1.default(repoToken);
         }
-        else if (eventName === 'issue_comment' && action === 'created') {
+        else if (event === 'issue_comment/created') {
             await created_1.default(repoToken);
         }
         else {
-            core.warning(`no handler for ${eventName}/${action}`);
+            core.warning(`no handler for ${event}`);
         }
     }
     catch (e) {
