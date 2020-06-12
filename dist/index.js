@@ -12558,6 +12558,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const opened_1 = __importDefault(__webpack_require__(108));
+const created_1 = __importDefault(__webpack_require__(501));
 const run = async () => {
     const { eventName, payload: { action }, } = github.context;
     const repoToken = core.getInput('repo-token', { required: true });
@@ -12565,6 +12566,9 @@ const run = async () => {
     try {
         if (eventName === 'issues' && action === 'opened') {
             await opened_1.default(repoToken);
+        }
+        else if (eventName === 'issue_comment' && action === 'created') {
+            await created_1.default(repoToken);
         }
         else {
             core.warning(`No handler for ${eventName}`);
@@ -16468,7 +16472,35 @@ module.exports = Symbol;
 /***/ }),
 /* 499 */,
 /* 500 */,
-/* 501 */,
+/* 501 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
+const run = async (repoToken) => {
+    const client = github.getOctokit(repoToken);
+    await client.issues.removeLabel({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        issue_number: github.context.issue.number,
+        name: 'needs-reply',
+    });
+    core.info(`removed needs-reply label from issue #${github.context.issue.number}`);
+};
+exports.default = run;
+
+
+/***/ }),
 /* 502 */,
 /* 503 */
 /***/ (function(module, __unusedexports, __webpack_require__) {

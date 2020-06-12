@@ -1,6 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import processIssueOpened from './events/issues/opened';
+import processIssueCommentCreated from './events/issue_comment/created';
 
 const run = async (): Promise<void> => {
   const {
@@ -15,6 +16,8 @@ const run = async (): Promise<void> => {
   try {
     if (eventName === 'issues' && action === 'opened') {
       await processIssueOpened(repoToken);
+    } else if (eventName === 'issue_comment' && action === 'created') {
+      await processIssueCommentCreated(repoToken);
     } else {
       core.warning(`No handler for ${eventName}`);
     }
