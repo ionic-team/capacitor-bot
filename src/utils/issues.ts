@@ -82,6 +82,6 @@ export const getSectionNodes = (header: Node, nodes: Node[]): Node[] => {
   return section;
 };
 
-export type Platform = 'android' | 'ios';
+export type Platform = 'android' | 'ios' | 'electron' | 'web';
 
-export const PLATFORMS: Platform[] = ['android', 'ios'];
+export const PLATFORMS: Platform[] = ['android', 'ios', 'electron', 'web'];

@@ -25,16 +25,17 @@ const run = async (repoToken: string) => {
   }
 
   const platforms = getPlatforms(section.nodes);
+  const labels = platforms.map(platform => `platform: ${platform}`);
 
   await client.issues.addLabels({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,
     issue_number: github.context.issue.number,
-    labels: platforms,
+    labels,
   });
 
   core.info(
-    `added ${platforms.join(', ')} labels to issue #${
+    `added ${labels.join(', ')} labels to issue #${
       github.context.issue.number
     }`,
   );

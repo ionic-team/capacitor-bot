@@ -2817,13 +2817,14 @@ const run = async (repoToken) => {
         return;
     }
     const platforms = issues_1.getPlatforms(section.nodes);
+    const labels = platforms.map(platform => `platform: ${platform}`);
     await client.issues.addLabels({
         owner: github.context.repo.owner,
         repo: github.context.repo.repo,
         issue_number: github.context.issue.number,
-        labels: platforms,
+        labels,
     });
-    core.info(`added ${platforms.join(', ')} labels to issue #${github.context.issue.number}`);
+    core.info(`added ${labels.join(', ')} labels to issue #${github.context.issue.number}`);
 };
 exports.default = run;
 
@@ -6173,7 +6174,7 @@ exports.getSectionNodes = (header, nodes) => {
     }
     return section;
 };
-exports.PLATFORMS = ['android', 'ios'];
+exports.PLATFORMS = ['android', 'ios', 'electron', 'web'];
 
 
 /***/ }),
