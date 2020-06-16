@@ -10422,7 +10422,26 @@ function coerce (version) {
 
 
 /***/ }),
-/* 281 */,
+/* 281 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseForOwn = __webpack_require__(920),
+    createBaseEach = __webpack_require__(919);
+
+/**
+ * The base implementation of `_.forEach` without support for iteratee shorthands.
+ *
+ * @private
+ * @param {Array|Object} collection The collection to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Array|Object} Returns `collection`.
+ */
+var baseEach = createBaseEach(baseForOwn);
+
+module.exports = baseEach;
+
+
+/***/ }),
 /* 282 */,
 /* 283 */
 /***/ (function(module) {
@@ -11810,7 +11829,28 @@ module.exports = {
 
 
 /***/ }),
-/* 354 */,
+/* 354 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var createBaseFor = __webpack_require__(989);
+
+/**
+ * The base implementation of `baseForOwn` which iterates over `object`
+ * properties returned by `keysFunc` and invokes `iteratee` for each property.
+ * Iteratee functions may exit iteration early by explicitly returning `false`.
+ *
+ * @private
+ * @param {Object} object The object to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @param {Function} keysFunc The function to get the keys of `object`.
+ * @returns {Object} Returns `object`.
+ */
+var baseFor = createBaseFor();
+
+module.exports = baseFor;
+
+
+/***/ }),
 /* 355 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -18427,12 +18467,44 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
+const sortBy_1 = __importDefault(__webpack_require__(828));
 const run = async (repoToken) => {
     const client = github.getOctokit(repoToken);
     try {
+        let page = 1;
+        const data = [];
+        while (true) {
+            const res = await client.issues.listEventsForTimeline({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                issue_number: github.context.issue.number,
+                per_page: 100,
+                page,
+            });
+            if (res.data.length === 0) {
+                break;
+            }
+            data.push(...res.data);
+            page++;
+        }
+        // TODO: There doesn't seem to be a way to sort the timeline from the API.
+        // Is there a better way?
+        const events = sortBy_1.default(entry => entry.created_at, data).reverse();
+        const lastLabel = events.find(event => event.event === 'labeled' && event.label.name === 'needs-reply');
+        if (!lastLabel) {
+            core.warning(`needs-reply label did not appear in timeline for issue #${github.context.issue.number}`);
+            return;
+        }
+        if (lastLabel.actor.login === github.context.payload.comment.user.login) {
+            core.info(`not removing label for comments by user who added it`);
+            return;
+        }
         await client.issues.removeLabel({
             owner: github.context.repo.owner,
             repo: github.context.repo.repo,
@@ -20311,7 +20383,56 @@ module.exports = {
 
 
 /***/ }),
-/* 552 */,
+/* 552 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var compareAscending = __webpack_require__(587);
+
+/**
+ * Used by `_.orderBy` to compare multiple properties of a value to another
+ * and stable sort them.
+ *
+ * If `orders` is unspecified, all values are sorted in ascending order. Otherwise,
+ * specify an order of "desc" for descending or "asc" for ascending sort order
+ * of corresponding values.
+ *
+ * @private
+ * @param {Object} object The object to compare.
+ * @param {Object} other The other object to compare.
+ * @param {boolean[]|string[]} orders The order to sort by for each property.
+ * @returns {number} Returns the sort order indicator for `object`.
+ */
+function compareMultiple(object, other, orders) {
+  var index = -1,
+      objCriteria = object.criteria,
+      othCriteria = other.criteria,
+      length = objCriteria.length,
+      ordersLength = orders.length;
+
+  while (++index < length) {
+    var result = compareAscending(objCriteria[index], othCriteria[index]);
+    if (result) {
+      if (index >= ordersLength) {
+        return result;
+      }
+      var order = orders[index];
+      return result * (order == 'desc' ? -1 : 1);
+    }
+  }
+  // Fixes an `Array#sort` bug in the JS engine embedded in Adobe applications
+  // that causes it, under certain circumstances, to provide the same value for
+  // `object` and `other`. See https://github.com/jashkenas/underscore/pull/1247
+  // for more details.
+  //
+  // This also ensures a stable sort in V8 and other engines.
+  // See https://bugs.chromium.org/p/v8/issues/detail?id=90 for more details.
+  return object.index - other.index;
+}
+
+module.exports = compareMultiple;
+
+
+/***/ }),
 /* 553 */
 /***/ (function(module) {
 
@@ -20608,7 +20729,60 @@ module.exports = parse;
 
 
 /***/ }),
-/* 569 */,
+/* 569 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseFlatten = __webpack_require__(496),
+    baseOrderBy = __webpack_require__(809),
+    baseRest = __webpack_require__(272),
+    isIterateeCall = __webpack_require__(663);
+
+/**
+ * Creates an array of elements, sorted in ascending order by the results of
+ * running each element in a collection thru each iteratee. This method
+ * performs a stable sort, that is, it preserves the original sort order of
+ * equal elements. The iteratees are invoked with one argument: (value).
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Collection
+ * @param {Array|Object} collection The collection to iterate over.
+ * @param {...(Function|Function[])} [iteratees=[_.identity]]
+ *  The iteratees to sort by.
+ * @returns {Array} Returns the new sorted array.
+ * @example
+ *
+ * var users = [
+ *   { 'user': 'fred',   'age': 48 },
+ *   { 'user': 'barney', 'age': 36 },
+ *   { 'user': 'fred',   'age': 40 },
+ *   { 'user': 'barney', 'age': 34 }
+ * ];
+ *
+ * _.sortBy(users, [function(o) { return o.user; }]);
+ * // => objects for [['barney', 36], ['barney', 34], ['fred', 48], ['fred', 40]]
+ *
+ * _.sortBy(users, ['user', 'age']);
+ * // => objects for [['barney', 34], ['barney', 36], ['fred', 40], ['fred', 48]]
+ */
+var sortBy = baseRest(function(collection, iteratees) {
+  if (collection == null) {
+    return [];
+  }
+  var length = iteratees.length;
+  if (length > 1 && isIterateeCall(collection, iteratees[0], iteratees[1])) {
+    iteratees = [];
+  } else if (length > 2 && isIterateeCall(iteratees[0], iteratees[1], iteratees[2])) {
+    iteratees = [iteratees[0]];
+  }
+  return baseOrderBy(collection, baseFlatten(iteratees, 1), []);
+});
+
+module.exports = sortBy;
+
+
+/***/ }),
 /* 570 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -21008,7 +21182,53 @@ module.exports = equalObjects;
 
 
 /***/ }),
-/* 587 */,
+/* 587 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var isSymbol = __webpack_require__(186);
+
+/**
+ * Compares values to sort them in ascending order.
+ *
+ * @private
+ * @param {*} value The value to compare.
+ * @param {*} other The other value to compare.
+ * @returns {number} Returns the sort order indicator for `value`.
+ */
+function compareAscending(value, other) {
+  if (value !== other) {
+    var valIsDefined = value !== undefined,
+        valIsNull = value === null,
+        valIsReflexive = value === value,
+        valIsSymbol = isSymbol(value);
+
+    var othIsDefined = other !== undefined,
+        othIsNull = other === null,
+        othIsReflexive = other === other,
+        othIsSymbol = isSymbol(other);
+
+    if ((!othIsNull && !othIsSymbol && !valIsSymbol && value > other) ||
+        (valIsSymbol && othIsDefined && othIsReflexive && !othIsNull && !othIsSymbol) ||
+        (valIsNull && othIsDefined && othIsReflexive) ||
+        (!valIsDefined && othIsReflexive) ||
+        !valIsReflexive) {
+      return 1;
+    }
+    if ((!valIsNull && !valIsSymbol && !othIsSymbol && value < other) ||
+        (othIsSymbol && valIsDefined && valIsReflexive && !valIsNull && !valIsSymbol) ||
+        (othIsNull && valIsDefined && valIsReflexive) ||
+        (!othIsDefined && valIsReflexive) ||
+        !othIsReflexive) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+module.exports = compareAscending;
+
+
+/***/ }),
 /* 588 */,
 /* 589 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -23143,7 +23363,42 @@ module.exports = baseIsSet;
 
 
 /***/ }),
-/* 663 */,
+/* 663 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var eq = __webpack_require__(338),
+    isArrayLike = __webpack_require__(146),
+    isIndex = __webpack_require__(160),
+    isObject = __webpack_require__(988);
+
+/**
+ * Checks if the given arguments are from an iteratee call.
+ *
+ * @private
+ * @param {*} value The potential iteratee value argument.
+ * @param {*} index The potential iteratee index or key argument.
+ * @param {*} object The potential iteratee object argument.
+ * @returns {boolean} Returns `true` if the arguments are from an iteratee call,
+ *  else `false`.
+ */
+function isIterateeCall(value, index, object) {
+  if (!isObject(object)) {
+    return false;
+  }
+  var type = typeof index;
+  if (type == 'number'
+        ? (isArrayLike(object) && isIndex(index, object.length))
+        : (type == 'string' && index in object)
+      ) {
+    return eq(object[index], value);
+  }
+  return false;
+}
+
+module.exports = isIterateeCall;
+
+
+/***/ }),
 /* 664 */
 /***/ (function(module) {
 
@@ -23350,7 +23605,33 @@ module.exports = ListCache;
 
 
 /***/ }),
-/* 671 */,
+/* 671 */
+/***/ (function(module) {
+
+/**
+ * The base implementation of `_.sortBy` which uses `comparer` to define the
+ * sort order of `array` and replaces criteria objects with their corresponding
+ * values.
+ *
+ * @private
+ * @param {Array} array The array to sort.
+ * @param {Function} comparer The function to define sort order.
+ * @returns {Array} Returns `array`.
+ */
+function baseSortBy(array, comparer) {
+  var length = array.length;
+
+  array.sort(comparer);
+  while (length--) {
+    array[length] = array[length].value;
+  }
+  return array;
+}
+
+module.exports = baseSortBy;
+
+
+/***/ }),
 /* 672 */
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -27497,7 +27778,46 @@ function blockHtml(eat, value, silent) {
 /* 806 */,
 /* 807 */,
 /* 808 */,
-/* 809 */,
+/* 809 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var arrayMap = __webpack_require__(766),
+    baseIteratee = __webpack_require__(776),
+    baseMap = __webpack_require__(852),
+    baseSortBy = __webpack_require__(671),
+    baseUnary = __webpack_require__(231),
+    compareMultiple = __webpack_require__(552),
+    identity = __webpack_require__(83);
+
+/**
+ * The base implementation of `_.orderBy` without param guards.
+ *
+ * @private
+ * @param {Array|Object} collection The collection to iterate over.
+ * @param {Function[]|Object[]|string[]} iteratees The iteratees to sort by.
+ * @param {string[]} orders The sort orders of `iteratees`.
+ * @returns {Array} Returns the new sorted array.
+ */
+function baseOrderBy(collection, iteratees, orders) {
+  var index = -1;
+  iteratees = arrayMap(iteratees.length ? iteratees : [identity], baseUnary(baseIteratee));
+
+  var result = baseMap(collection, function(value, key, collection) {
+    var criteria = arrayMap(iteratees, function(iteratee) {
+      return iteratee(value);
+    });
+    return { 'criteria': criteria, 'index': ++index, 'value': value };
+  });
+
+  return baseSortBy(result, function(object, other) {
+    return compareMultiple(object, other, orders);
+  });
+}
+
+module.exports = baseOrderBy;
+
+
+/***/ }),
 /* 810 */,
 /* 811 */,
 /* 812 */
@@ -27886,7 +28206,17 @@ module.exports = root;
 /* 825 */,
 /* 826 */,
 /* 827 */,
-/* 828 */,
+/* 828 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var convert = __webpack_require__(822),
+    func = convert('sortBy', __webpack_require__(569));
+
+func.placeholder = __webpack_require__(801);
+module.exports = func;
+
+
+/***/ }),
 /* 829 */
 /***/ (function(module) {
 
@@ -30386,7 +30716,34 @@ module.exports = baseKeysIn;
 
 
 /***/ }),
-/* 852 */,
+/* 852 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseEach = __webpack_require__(281),
+    isArrayLike = __webpack_require__(146);
+
+/**
+ * The base implementation of `_.map` without support for iteratee shorthands.
+ *
+ * @private
+ * @param {Array|Object} collection The collection to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Array} Returns the new mapped array.
+ */
+function baseMap(collection, iteratee) {
+  var index = -1,
+      result = isArrayLike(collection) ? Array(collection.length) : [];
+
+  baseEach(collection, function(value, key, collection) {
+    result[++index] = iteratee(value, key, collection);
+  });
+  return result;
+}
+
+module.exports = baseMap;
+
+
+/***/ }),
 /* 853 */
 /***/ (function(module) {
 
@@ -31851,8 +32208,66 @@ module.exports = {
 /***/ }),
 /* 917 */,
 /* 918 */,
-/* 919 */,
-/* 920 */,
+/* 919 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var isArrayLike = __webpack_require__(146);
+
+/**
+ * Creates a `baseEach` or `baseEachRight` function.
+ *
+ * @private
+ * @param {Function} eachFunc The function to iterate over a collection.
+ * @param {boolean} [fromRight] Specify iterating from right to left.
+ * @returns {Function} Returns the new base function.
+ */
+function createBaseEach(eachFunc, fromRight) {
+  return function(collection, iteratee) {
+    if (collection == null) {
+      return collection;
+    }
+    if (!isArrayLike(collection)) {
+      return eachFunc(collection, iteratee);
+    }
+    var length = collection.length,
+        index = fromRight ? length : -1,
+        iterable = Object(collection);
+
+    while ((fromRight ? index-- : ++index < length)) {
+      if (iteratee(iterable[index], index, iterable) === false) {
+        break;
+      }
+    }
+    return collection;
+  };
+}
+
+module.exports = createBaseEach;
+
+
+/***/ }),
+/* 920 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseFor = __webpack_require__(354),
+    keys = __webpack_require__(863);
+
+/**
+ * The base implementation of `_.forOwn` without support for iteratee shorthands.
+ *
+ * @private
+ * @param {Object} object The object to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Object} Returns `object`.
+ */
+function baseForOwn(object, iteratee) {
+  return object && baseFor(object, iteratee, keys);
+}
+
+module.exports = baseForOwn;
+
+
+/***/ }),
 /* 921 */,
 /* 922 */,
 /* 923 */
@@ -33441,7 +33856,37 @@ module.exports = isObject;
 
 
 /***/ }),
-/* 989 */,
+/* 989 */
+/***/ (function(module) {
+
+/**
+ * Creates a base function for methods like `_.forIn` and `_.forOwn`.
+ *
+ * @private
+ * @param {boolean} [fromRight] Specify iterating from right to left.
+ * @returns {Function} Returns the new base function.
+ */
+function createBaseFor(fromRight) {
+  return function(object, iteratee, keysFunc) {
+    var index = -1,
+        iterable = Object(object),
+        props = keysFunc(object),
+        length = props.length;
+
+    while (length--) {
+      var key = props[fromRight ? length : ++index];
+      if (iteratee(iterable[key], key, iterable) === false) {
+        break;
+      }
+    }
+    return object;
+  };
+}
+
+module.exports = createBaseFor;
+
+
+/***/ }),
 /* 990 */
 /***/ (function(module) {
 
