@@ -1,5 +1,5 @@
-name: Capacitor Bot
-description: The bot for Capacitor repos.
+name: Bot
+description: The bot for Ionic and Capacitor repos.
 inputs:
   repo-token:
     description: Personal Access Token for GitHub Repository

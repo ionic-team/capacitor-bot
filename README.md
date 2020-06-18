@@ -1,3 +1,3 @@
-# Capacitor Bot
+# Bot
 
-The bot for Capacitor repos, implemented using GitHub Actions.
+The bot for Ionic and Capacitor repos, implemented using GitHub Actions.
