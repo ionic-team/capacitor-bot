@@ -1,22 +1,32 @@
 import * as core from '@actions/core';
-import * as exec from '@actions/exec';
 import * as github from '@actions/github';
+import * as exec from '@actions/exec';
 import { readFile, writeFile } from 'fs-extra';
 import difference from 'lodash/difference';
 
+import type { GitHubClient } from '../client';
+import type { Task } from '../config';
 import {
   findSectionByLooseTitle,
   parseMarkdownIntoSections,
 } from '../utils/markdown';
-
+import { parseContributors, generateContributors } from '../utils/contributors';
 import { replaceRange } from '../utils/str';
-import { generateContributors, parseContributors } from '../utils/contributors';
 
-const run = async (repoToken: string) => {
-  const base = 'master';
-  const file = 'README.md';
-  const client = github.getOctokit(repoToken);
+export interface AddContributorsConfig {
+  base?: string;
+  file?: string;
+}
 
+export type AddContributorsTask = Task<
+  'add-contributors',
+  AddContributorsConfig
+>;
+
+const run = async (
+  client: GitHubClient,
+  { base = 'master', file = 'README.md' }: AddContributorsConfig,
+) => {
   if (github.context.ref !== `refs/heads/${base}`) {
     core.info(`not processing for ref: ${github.context.ref}`);
     return;

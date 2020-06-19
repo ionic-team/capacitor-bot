@@ -1,14 +1,22 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 
-import { getPlatforms } from '../../utils/issues';
+import type { GitHubClient } from '../client';
+import type { Task } from '../config';
+import { getPlatforms } from '../utils/issues';
 import {
   parseMarkdownIntoSections,
   findSectionByLooseTitle,
-} from '../../utils/markdown';
+} from '../utils/markdown';
 
-const run = async (repoToken: string) => {
-  const client = github.getOctokit(repoToken);
+export type AddPlatformLabelsConfig = undefined;
+
+export type AddPlatformLabelsTask = Task<
+  'add-platform-labels',
+  AddPlatformLabelsConfig
+>;
+
+const run = async (client: GitHubClient, config: AddPlatformLabelsConfig) => {
   const { issue } = github.context.payload;
 
   if (!issue || !issue.body) {

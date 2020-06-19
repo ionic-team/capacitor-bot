@@ -1,30 +1,39 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import * as util from 'util';
 
-import processPush from './events/push';
-import processIssueOpened from './events/issues/opened';
-import processIssueCommentCreated from './events/issue_comment/created';
+import { getClient } from './client';
+import { getConfig } from './config';
+import { runTask, createTriggeredBy } from './tasks';
 
 const run = async (): Promise<void> => {
-  const {
-    eventName,
-    payload: { action },
-  } = github.context;
-
-  const repoToken = core.getInput('repo-token', { required: true });
-  const event = action ? `${eventName}/${action}` : eventName;
-
-  core.info(`Received event: ${event}`);
-
   try {
-    if (event === 'push') {
-      await processPush(repoToken);
-    } else if (event === 'issues/opened') {
-      await processIssueOpened(repoToken);
-    } else if (event === 'issue_comment/created') {
-      await processIssueCommentCreated(repoToken);
-    } else {
-      core.warning(`no handler for ${event}`);
+    const {
+      eventName,
+      payload: { action },
+    } = github.context;
+
+    const repoToken = core.getInput('repo-token', { required: true });
+    const configPath = core.getInput('config-path', { required: true });
+
+    const event = `${eventName}${action ? ` (type: ${action})` : ''}`;
+    core.info(`triggered by: ${event}`);
+
+    const client = getClient(repoToken);
+    const config = await getConfig(client, configPath);
+    core.info(`using config from ${configPath}`);
+
+    const triggeredBy = createTriggeredBy(eventName, action);
+    const tasks = config.tasks.filter(triggeredBy);
+
+    if (tasks.length === 0) {
+      core.warning(`no tasks configured for ${event}`);
+      return;
+    }
+
+    for (const task of tasks) {
+      core.info(`running ${task.name} task for ${event} event`);
+      await runTask(client, task);
     }
   } catch (e) {
     core.error(e);

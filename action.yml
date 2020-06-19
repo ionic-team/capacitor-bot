@@ -4,6 +4,9 @@ inputs:
   repo-token:
     description: Personal Access Token for GitHub Repository
     required: true
+  config-path:
+    description: Path to config file
+    default: .github/bot.yml
 runs:
   using: node12
   main: dist/index.js
