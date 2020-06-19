@@ -32,11 +32,20 @@ export const createTriggeredBy = (event: string, type?: string) => (
 
   const { [event]: eventConfig } = task.on;
 
+  if (typeof eventConfig === 'undefined') {
+    return false;
+  }
+
   if (eventConfig === null) {
     return true;
   }
 
-  if (eventConfig && eventConfig.types.find(t => t === type)) {
+  if ('types' in eventConfig && eventConfig.types.find(t => t === type)) {
+    return true;
+  }
+
+  // TODO: branches and tags are not supported yet
+  if (event === 'push' || event === 'pull_request') {
     return true;
   }
 

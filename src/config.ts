@@ -6,9 +6,9 @@ import type { AddPlatformLabelsTask } from './tasks/add-platform-labels';
 import type { AddContributorsTask } from './tasks/add-contributors';
 
 export interface TriggerObject {
-  [key: string]:
+  readonly [key: string]:
     | {
-        types: string[];
+        readonly types: readonly string[];
       }
     | null
     | undefined;
@@ -17,9 +17,9 @@ export interface TriggerObject {
 export type Trigger = string | string[] | TriggerObject;
 
 export interface Task<N, C> {
-  name: N;
-  on: Trigger;
-  config: C;
+  readonly name: N;
+  readonly on: Trigger;
+  readonly config: C;
 }
 
 export type AnyTask =

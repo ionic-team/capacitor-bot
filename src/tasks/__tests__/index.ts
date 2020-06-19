@@ -35,6 +35,30 @@ describe('tasks', () => {
       expect(triggeredBy(task)).toEqual(true);
     });
 
+    // TODO: this test should be removed when branches are supported
+    it('should be triggered from object with branches', () => {
+      const triggeredBy = createTriggeredBy('push');
+      const task = {
+        name: 'foo',
+        on: { push: { branches: ['master'] } },
+        config: undefined,
+      };
+
+      expect(triggeredBy(task as any)).toEqual(true);
+    });
+
+    // TODO: this test should be removed when tags are supported
+    it('should be triggered from object with tags', () => {
+      const triggeredBy = createTriggeredBy('push');
+      const task = {
+        name: 'foo',
+        on: { push: { tags: ['v1'] } },
+        config: undefined,
+      };
+
+      expect(triggeredBy(task as any)).toEqual(true);
+    });
+
     it('should be triggered from object with types', () => {
       const triggeredBy = createTriggeredBy('release', 'published');
       const task = {
