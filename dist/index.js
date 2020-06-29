@@ -11338,7 +11338,34 @@ function strikethrough(eat, value, silent) {
 
 /***/ }),
 /* 285 */,
-/* 286 */,
+/* 286 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
+const run = async (client, { label }) => {
+    await client.issues.addLabels({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        issue_number: github.context.issue.number,
+        labels: [label],
+    });
+    core.info(`added ${label} label to issue #${github.context.issue.number}`);
+};
+exports.default = run;
+
+
+/***/ }),
 /* 287 */
 /***/ (function(module) {
 
@@ -20283,12 +20310,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const add_label_1 = __importDefault(__webpack_require__(286));
 const remove_label_1 = __importDefault(__webpack_require__(599));
 const add_platform_labels_1 = __importDefault(__webpack_require__(243));
 const add_contributors_1 = __importDefault(__webpack_require__(5));
 const comment_on_label_1 = __importDefault(__webpack_require__(653));
 exports.runTask = async (client, task) => {
     switch (task.name) {
+        case 'add-label':
+            return add_label_1.default(client, task.config);
         case 'remove-label':
             return remove_label_1.default(client, task.config);
         case 'add-platform-labels':
