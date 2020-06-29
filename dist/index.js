@@ -16391,7 +16391,7 @@ var legacy = __webpack_require__(177)
 var hexadecimal = __webpack_require__(928)
 var decimal = __webpack_require__(926)
 var alphanumerical = __webpack_require__(110)
-var dangerous = __webpack_require__(475)
+var dangerous = __webpack_require__(957)
 
 module.exports = encode
 encode.escape = escape
@@ -18668,7 +18668,7 @@ proto.blockTokenizers = {
   indentedCode: __webpack_require__(849),
   fencedCode: __webpack_require__(442),
   blockquote: __webpack_require__(705),
-  atxHeading: __webpack_require__(841),
+  atxHeading: __webpack_require__(758),
   thematicBreak: __webpack_require__(880),
   list: __webpack_require__(194),
   setextHeading: __webpack_require__(803),
@@ -19784,9 +19784,33 @@ rimraf.sync = rimrafSync
 
 /***/ }),
 /* 475 */
-/***/ (function(module) {
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-module.exports = ["cent","copy","divide","gt","lt","not","para","times"];
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
+const github_1 = __webpack_require__(841);
+const run = async (client, options) => {
+    const { label } = github.context.payload;
+    if (!label) {
+        core.warning('no label in event payload');
+        return;
+    }
+    if (options.name === label.name) {
+        await github_1.createComment(client, options);
+    }
+};
+exports.default = run;
+
 
 /***/ }),
 /* 476 */,
@@ -20196,15 +20220,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const add_comment_1 = __importDefault(__webpack_require__(627));
+const add_comment_for_label_1 = __importDefault(__webpack_require__(475));
 const add_label_1 = __importDefault(__webpack_require__(286));
 const remove_label_1 = __importDefault(__webpack_require__(599));
 const add_platform_labels_1 = __importDefault(__webpack_require__(243));
 const add_contributors_1 = __importDefault(__webpack_require__(5));
-const comment_on_label_1 = __importDefault(__webpack_require__(653));
 exports.runTask = async (client, task) => {
     switch (task.name) {
         case 'add-comment':
             return add_comment_1.default(client, task.config);
+        case 'add-comment-for-label':
+            return add_comment_for_label_1.default(client, task.config);
         case 'add-label':
             return add_label_1.default(client, task.config);
         case 'remove-label':
@@ -20213,8 +20239,6 @@ exports.runTask = async (client, task) => {
             return add_platform_labels_1.default(client, task.config);
         case 'add-contributors':
             return add_contributors_1.default(client, task.config);
-        case 'comment-on-label':
-            return comment_on_label_1.default(client, task.config);
     }
 };
 exports.createTriggeredBy = (event, type) => (task) => {
@@ -23802,24 +23826,10 @@ module.exports = require("path");
 
 "use strict";
 
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const core = __importStar(__webpack_require__(470));
-const github = __importStar(__webpack_require__(469));
-const run = async (client, { comment }) => {
-    await client.issues.createComment({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        issue_number: github.context.issue.number,
-        body: comment,
-    });
-    core.info(`added comment to issue #${github.context.issue.number}`);
+const github_1 = __webpack_require__(841);
+const run = async (client, options) => {
+    await github_1.createComment(client, options);
 };
 exports.default = run;
 
@@ -24552,62 +24562,7 @@ function locate(value, fromIndex) {
 
 /***/ }),
 /* 652 */,
-/* 653 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const core = __importStar(__webpack_require__(470));
-const github = __importStar(__webpack_require__(469));
-const run = async (client, { labels }) => {
-    const { label } = github.context.payload;
-    if (!label) {
-        core.warning('no label in event payload');
-        return;
-    }
-    for (const labelConfig of labels) {
-        if (labelConfig.name === label.name) {
-            if (labelConfig.comment) {
-                await client.issues.createComment({
-                    owner: github.context.repo.owner,
-                    repo: github.context.repo.repo,
-                    issue_number: github.context.issue.number,
-                    body: labelConfig.comment,
-                });
-                core.info(`added comment to issue #${github.context.issue.number}`);
-            }
-            if (labelConfig.close) {
-                await client.issues.update({
-                    owner: github.context.repo.owner,
-                    repo: github.context.repo.repo,
-                    issue_number: github.context.issue.number,
-                    state: 'closed',
-                });
-                core.info(`closed issue #${github.context.issue.number}`);
-            }
-            if (labelConfig.lock) {
-                await client.issues.lock({
-                    owner: github.context.repo.owner,
-                    repo: github.context.repo.repo,
-                    issue_number: github.context.issue.number,
-                });
-                core.info(`locked issue #${github.context.issue.number}`);
-            }
-        }
-    }
-};
-exports.default = run;
-
-
-/***/ }),
+/* 653 */,
 /* 654 */
 /***/ (function(module) {
 
@@ -29433,7 +29388,148 @@ module.exports = listCacheGet;
 /***/ }),
 /* 756 */,
 /* 757 */,
-/* 758 */,
+/* 758 */
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = atxHeading
+
+var lineFeed = '\n'
+var tab = '\t'
+var space = ' '
+var numberSign = '#'
+
+var maxFenceCount = 6
+
+function atxHeading(eat, value, silent) {
+  var self = this
+  var pedantic = self.options.pedantic
+  var length = value.length + 1
+  var index = -1
+  var now = eat.now()
+  var subvalue = ''
+  var content = ''
+  var character
+  var queue
+  var depth
+
+  // Eat initial spacing.
+  while (++index < length) {
+    character = value.charAt(index)
+
+    if (character !== space && character !== tab) {
+      index--
+      break
+    }
+
+    subvalue += character
+  }
+
+  // Eat hashes.
+  depth = 0
+
+  while (++index <= length) {
+    character = value.charAt(index)
+
+    if (character !== numberSign) {
+      index--
+      break
+    }
+
+    subvalue += character
+    depth++
+  }
+
+  if (depth > maxFenceCount) {
+    return
+  }
+
+  if (!depth || (!pedantic && value.charAt(index + 1) === numberSign)) {
+    return
+  }
+
+  length = value.length + 1
+
+  // Eat intermediate white-space.
+  queue = ''
+
+  while (++index < length) {
+    character = value.charAt(index)
+
+    if (character !== space && character !== tab) {
+      index--
+      break
+    }
+
+    queue += character
+  }
+
+  // Exit when not in pedantic mode without spacing.
+  if (!pedantic && queue.length === 0 && character && character !== lineFeed) {
+    return
+  }
+
+  if (silent) {
+    return true
+  }
+
+  // Eat content.
+  subvalue += queue
+  queue = ''
+  content = ''
+
+  while (++index < length) {
+    character = value.charAt(index)
+
+    if (!character || character === lineFeed) {
+      break
+    }
+
+    if (character !== space && character !== tab && character !== numberSign) {
+      content += queue + character
+      queue = ''
+      continue
+    }
+
+    while (character === space || character === tab) {
+      queue += character
+      character = value.charAt(++index)
+    }
+
+    // `#` without a queue is part of the content.
+    if (!pedantic && content && !queue && character === numberSign) {
+      content += character
+      continue
+    }
+
+    while (character === numberSign) {
+      queue += character
+      character = value.charAt(++index)
+    }
+
+    while (character === space || character === tab) {
+      queue += character
+      character = value.charAt(++index)
+    }
+
+    index--
+  }
+
+  now.column += subvalue.length
+  now.offset += subvalue.length
+  subvalue += content + queue
+
+  return eat(subvalue)({
+    type: 'heading',
+    depth: depth,
+    children: self.tokenizeInline(content, now)
+  })
+}
+
+
+/***/ }),
 /* 759 */,
 /* 760 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -33234,144 +33330,48 @@ module.exports = baseIsEqualDeep;
 
 /***/ }),
 /* 841 */
-/***/ (function(module) {
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
 
-
-module.exports = atxHeading
-
-var lineFeed = '\n'
-var tab = '\t'
-var space = ' '
-var numberSign = '#'
-
-var maxFenceCount = 6
-
-function atxHeading(eat, value, silent) {
-  var self = this
-  var pedantic = self.options.pedantic
-  var length = value.length + 1
-  var index = -1
-  var now = eat.now()
-  var subvalue = ''
-  var content = ''
-  var character
-  var queue
-  var depth
-
-  // Eat initial spacing.
-  while (++index < length) {
-    character = value.charAt(index)
-
-    if (character !== space && character !== tab) {
-      index--
-      break
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
+exports.createComment = async (client, options) => {
+    if (options.comment) {
+        await client.issues.createComment({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            issue_number: github.context.issue.number,
+            body: options.comment,
+        });
+        core.info(`added comment to issue #${github.context.issue.number}`);
     }
-
-    subvalue += character
-  }
-
-  // Eat hashes.
-  depth = 0
-
-  while (++index <= length) {
-    character = value.charAt(index)
-
-    if (character !== numberSign) {
-      index--
-      break
+    if (options.close) {
+        await client.issues.update({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            issue_number: github.context.issue.number,
+            state: 'closed',
+        });
+        core.info(`closed issue #${github.context.issue.number}`);
     }
-
-    subvalue += character
-    depth++
-  }
-
-  if (depth > maxFenceCount) {
-    return
-  }
-
-  if (!depth || (!pedantic && value.charAt(index + 1) === numberSign)) {
-    return
-  }
-
-  length = value.length + 1
-
-  // Eat intermediate white-space.
-  queue = ''
-
-  while (++index < length) {
-    character = value.charAt(index)
-
-    if (character !== space && character !== tab) {
-      index--
-      break
+    if (options.lock) {
+        await client.issues.lock({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            issue_number: github.context.issue.number,
+        });
+        core.info(`locked issue #${github.context.issue.number}`);
     }
-
-    queue += character
-  }
-
-  // Exit when not in pedantic mode without spacing.
-  if (!pedantic && queue.length === 0 && character && character !== lineFeed) {
-    return
-  }
-
-  if (silent) {
-    return true
-  }
-
-  // Eat content.
-  subvalue += queue
-  queue = ''
-  content = ''
-
-  while (++index < length) {
-    character = value.charAt(index)
-
-    if (!character || character === lineFeed) {
-      break
-    }
-
-    if (character !== space && character !== tab && character !== numberSign) {
-      content += queue + character
-      queue = ''
-      continue
-    }
-
-    while (character === space || character === tab) {
-      queue += character
-      character = value.charAt(++index)
-    }
-
-    // `#` without a queue is part of the content.
-    if (!pedantic && content && !queue && character === numberSign) {
-      content += character
-      continue
-    }
-
-    while (character === numberSign) {
-      queue += character
-      character = value.charAt(++index)
-    }
-
-    while (character === space || character === tab) {
-      queue += character
-      character = value.charAt(++index)
-    }
-
-    index--
-  }
-
-  now.column += subvalue.length
-  now.offset += subvalue.length
-  subvalue += content + queue
-
-  return eat(subvalue)({
-    type: 'heading',
-    depth: depth,
-    children: self.tokenizeInline(content, now)
-  })
-}
+};
 
 
 /***/ }),
@@ -38414,7 +38414,12 @@ module.exports.shellSync = (cmd, opts) => handleShell(module.exports.sync, cmd, 
 
 /***/ }),
 /* 956 */,
-/* 957 */,
+/* 957 */
+/***/ (function(module) {
+
+module.exports = ["cent","copy","divide","gt","lt","not","para","times"];
+
+/***/ }),
 /* 958 */,
 /* 959 */
 /***/ (function(module, __unusedexports, __webpack_require__) {

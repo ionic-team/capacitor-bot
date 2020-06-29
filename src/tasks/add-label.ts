@@ -5,7 +5,7 @@ import type { GitHubClient } from '../client';
 import type { Task } from '../config';
 
 export interface AddLabelConfig {
-  label: string;
+  readonly label: string;
 }
 
 export type AddLabelTask = Task<'add-label', AddLabelConfig>;

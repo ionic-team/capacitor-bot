@@ -2,11 +2,11 @@ import type { GitHubClient } from '../client';
 import type { AnyTask, Task } from '../config';
 
 import addComment from './add-comment';
+import addCommentForLabel from './add-comment-for-label';
 import addLabel from './add-label';
 import removeLabel from './remove-label';
 import addPlatformLabels from './add-platform-labels';
 import addContributors from './add-contributors';
-import commentOnLabel from './comment-on-label';
 
 export const runTask = async (
   client: GitHubClient,
@@ -15,6 +15,8 @@ export const runTask = async (
   switch (task.name) {
     case 'add-comment':
       return addComment(client, task.config);
+    case 'add-comment-for-label':
+      return addCommentForLabel(client, task.config);
     case 'add-label':
       return addLabel(client, task.config);
     case 'remove-label':
@@ -23,8 +25,6 @@ export const runTask = async (
       return addPlatformLabels(client, task.config);
     case 'add-contributors':
       return addContributors(client, task.config);
-    case 'comment-on-label':
-      return commentOnLabel(client, task.config);
   }
 };
 
