@@ -3,6 +3,7 @@ import * as github from '@actions/github';
 import * as exec from '@actions/exec';
 import { readFile, writeFile } from 'fs-extra';
 import difference from 'lodash/difference';
+import template from 'lodash/fp/template';
 
 import type { GitHubClient } from '../client';
 import type { Task } from '../config';
@@ -16,6 +17,7 @@ import { replaceRange } from '../utils/str';
 export interface AddContributorsConfig {
   base?: string;
   file?: string;
+  commitMsg?: string;
 }
 
 export type AddContributorsTask = Task<
@@ -25,7 +27,11 @@ export type AddContributorsTask = Task<
 
 const run = async (
   client: GitHubClient,
-  { base = 'master', file = 'README.md' }: AddContributorsConfig,
+  {
+    base = 'master',
+    file = 'README.md',
+    commitMsg = 'add new contributor(s) to <%= file %>',
+  }: AddContributorsConfig,
 ) => {
   if (github.context.ref !== `refs/heads/${base}`) {
     core.info(`not processing for ref: ${github.context.ref}`);
@@ -115,9 +121,8 @@ const run = async (
     generateContributors(allContributors),
   );
 
-  const message = `add new contributor${
-    newContributors.length === 1 ? '' : 's'
-  } to ${file}`;
+  const tmpl = template(commitMsg);
+  const message = tmpl({ base, file });
 
   await writeFile(file, newContents);
   await exec.exec('git', ['checkout', '-b', branch]);

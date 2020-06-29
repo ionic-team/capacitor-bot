@@ -56,3 +56,4 @@ The `tasks` key is an array of tasks, the event that triggers them, and their co
 - `add-contributors`: Open a PR to modify `README.md` when a new contributor appears in a base branch
     - `base`: the base branch
     - `file`: the file to edit (usually `README.md`)
+    - `commitMsg`: the [lodash template](https://lodash.com/docs#template) for the commit message; properties: `base`, `file`
