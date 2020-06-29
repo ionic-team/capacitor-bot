@@ -1,6 +1,5 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import * as util from 'util';
 
 import { getClient } from './client';
 import { getConfig } from './config';

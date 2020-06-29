@@ -4,6 +4,7 @@ import type { AnyTask, Task } from '../config';
 import removeLabel from './remove-label';
 import addPlatformLabels from './add-platform-labels';
 import addContributors from './add-contributors';
+import commentOnLabel from './comment-on-label';
 
 export const runTask = async (
   client: GitHubClient,
@@ -16,6 +17,8 @@ export const runTask = async (
       return addPlatformLabels(client, task.config);
     case 'add-contributors':
       return addContributors(client, task.config);
+    case 'comment-on-label':
+      return commentOnLabel(client, task.config);
   }
 };
 

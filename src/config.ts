@@ -4,6 +4,7 @@ import { GitHubClient, getFileFromRepo } from './client';
 import type { RemoveLabelTask } from './tasks/remove-label';
 import type { AddPlatformLabelsTask } from './tasks/add-platform-labels';
 import type { AddContributorsTask } from './tasks/add-contributors';
+import type { CommentOnLabelTask } from './tasks/comment-on-label';
 
 export interface TriggerObject {
   readonly [key: string]:
@@ -25,7 +26,8 @@ export interface Task<N, C> {
 export type AnyTask =
   | RemoveLabelTask
   | AddPlatformLabelsTask
-  | AddContributorsTask;
+  | AddContributorsTask
+  | CommentOnLabelTask;
 
 export interface Config {
   readonly tasks: readonly AnyTask[];

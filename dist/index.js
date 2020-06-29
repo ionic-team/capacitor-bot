@@ -20286,6 +20286,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const remove_label_1 = __importDefault(__webpack_require__(599));
 const add_platform_labels_1 = __importDefault(__webpack_require__(243));
 const add_contributors_1 = __importDefault(__webpack_require__(5));
+const comment_on_label_1 = __importDefault(__webpack_require__(653));
 exports.runTask = async (client, task) => {
     switch (task.name) {
         case 'remove-label':
@@ -20294,6 +20295,8 @@ exports.runTask = async (client, task) => {
             return add_platform_labels_1.default(client, task.config);
         case 'add-contributors':
             return add_contributors_1.default(client, task.config);
+        case 'comment-on-label':
+            return comment_on_label_1.default(client, task.config);
     }
 };
 exports.createTriggeredBy = (event, type) => (task) => {
@@ -24727,7 +24730,62 @@ function locate(value, fromIndex) {
 
 /***/ }),
 /* 652 */,
-/* 653 */,
+/* 653 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
+const run = async (client, { labels }) => {
+    const { label } = github.context.payload;
+    if (!label) {
+        core.warning('no label in event payload');
+        return;
+    }
+    for (const labelConfig of labels) {
+        if (labelConfig.name === label.name) {
+            if (labelConfig.comment) {
+                await client.issues.createComment({
+                    owner: github.context.repo.owner,
+                    repo: github.context.repo.repo,
+                    issue_number: github.context.issue.number,
+                    body: labelConfig.comment,
+                });
+                core.info(`added comment to issue #${github.context.issue.number}`);
+            }
+            if (labelConfig.close) {
+                await client.issues.update({
+                    owner: github.context.repo.owner,
+                    repo: github.context.repo.repo,
+                    issue_number: github.context.issue.number,
+                    state: 'closed',
+                });
+                core.info(`closed issue #${github.context.issue.number}`);
+            }
+            if (labelConfig.lock) {
+                await client.issues.lock({
+                    owner: github.context.repo.owner,
+                    repo: github.context.repo.repo,
+                    issue_number: github.context.issue.number,
+                });
+                core.info(`locked issue #${github.context.issue.number}`);
+            }
+        }
+    }
+};
+exports.default = run;
+
+
+/***/ }),
 /* 654 */
 /***/ (function(module) {
 
