@@ -23462,9 +23462,8 @@ const run = async (client, { label, 'exclude-labeler': excludeLabeler = true }) 
                 core.warning(`${label} label did not appear in timeline for issue #${github.context.issue.number}`);
                 return;
             }
-            // TODO: handle more than the issue_comment event
-            if (lastLabel.actor.login === github.context.payload.comment.user.login) {
-                core.info(`not removing ${label} label for comments by user who added it`);
+            if (lastLabel.actor.login === github.context.actor) {
+                core.info(`not removing ${label} label for action by user who added it`);
                 return;
             }
         }

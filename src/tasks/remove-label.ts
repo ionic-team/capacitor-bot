@@ -53,12 +53,9 @@ const run = async (
         return;
       }
 
-      // TODO: handle more than the issue_comment event
-      if (
-        lastLabel.actor.login === github.context.payload.comment!.user.login
-      ) {
+      if (lastLabel.actor.login === github.context.actor) {
         core.info(
-          `not removing ${label} label for comments by user who added it`,
+          `not removing ${label} label for action by user who added it`,
         );
         return;
       }
