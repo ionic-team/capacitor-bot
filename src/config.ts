@@ -1,6 +1,7 @@
 import * as yaml from 'js-yaml';
 
 import { GitHubClient, getFileFromRepo } from './client';
+import type { AddCommentTask } from './tasks/add-comment';
 import type { AddLabelTask } from './tasks/add-label';
 import type { RemoveLabelTask } from './tasks/remove-label';
 import type { AddPlatformLabelsTask } from './tasks/add-platform-labels';
@@ -25,6 +26,7 @@ export interface Task<N, C> {
 }
 
 export type AnyTask =
+  | AddCommentTask
   | AddLabelTask
   | RemoveLabelTask
   | AddPlatformLabelsTask

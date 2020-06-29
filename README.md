@@ -49,6 +49,8 @@ The `tasks` key is an array of tasks, the event that triggers them, and their co
 
 ##### Tasks
 
+- `add-comment`: Add a comment to an issue
+  - `comment` _(string)_: the comment text
 - `add-label`: Add a label to an issue
   - `label` _(string)_: the label to add
 - `remove-label`: Remove a label from an issue

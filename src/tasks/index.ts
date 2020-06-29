@@ -1,6 +1,7 @@
 import type { GitHubClient } from '../client';
 import type { AnyTask, Task } from '../config';
 
+import addComment from './add-comment';
 import addLabel from './add-label';
 import removeLabel from './remove-label';
 import addPlatformLabels from './add-platform-labels';
@@ -12,6 +13,8 @@ export const runTask = async (
   task: AnyTask,
 ): Promise<void> => {
   switch (task.name) {
+    case 'add-comment':
+      return addComment(client, task.config);
     case 'add-label':
       return addLabel(client, task.config);
     case 'remove-label':
