@@ -477,16 +477,17 @@ const template_1 = __importDefault(__webpack_require__(838));
 const markdown_1 = __webpack_require__(184);
 const contributors_1 = __webpack_require__(6);
 const str_1 = __webpack_require__(508);
-const run = async (client, { base = 'master', file = 'README.md', commitMsg = 'add new contributor(s) to <%= file %>', }) => {
+const run = async (client, { base = 'master', file = 'README.md', 'commit-message': commitMessage = 'add new contributor(s) to <%= file %>', 'exclude-pattern': excludePattern = '^.+(?<!\\[bot\\])$', }) => {
     if (github.context.ref !== `refs/heads/${base}`) {
         core.info(`not processing for ref: ${github.context.ref}`);
         return;
     }
     const { commits } = github.context.payload;
     core.info(`processing commits: ${commits.map((commit) => commit.id).join(', ')}`);
+    const authorFilter = str_1.createFilterByPattern(new RegExp(excludePattern));
     const authors = commits
         .map((commit) => commit.author)
-        .filter((author) => !author.username.endsWith('[bot]'));
+        .filter((author) => authorFilter(author.username));
     if (authors.length === 0) {
         core.warning(`no human authors found for commits!`);
         return;
@@ -525,7 +526,7 @@ const run = async (client, { base = 'master', file = 'README.md', commitMsg = 'a
     const allContributors = [...newContributors, ...contributors];
     const { start: { offset: startOffset }, end: { offset: endOffset }, } = htmlNode.position;
     const newContents = str_1.replaceRange(contents, startOffset, endOffset, contributors_1.generateContributors(allContributors));
-    const tmpl = template_1.default(commitMsg);
+    const tmpl = template_1.default(commitMessage);
     const message = tmpl({ base, file });
     await fs_extra_1.writeFile(file, newContents);
     await exec.exec('git', ['checkout', '-b', branch]);
@@ -20442,6 +20443,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.replaceRange = (str, start, end, replacement) => {
     return str.substring(0, start) + replacement + str.substring(end);
 };
+exports.createFilterByPattern = (re) => (s) => re.test(s);
 
 
 /***/ }),

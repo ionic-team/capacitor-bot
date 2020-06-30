@@ -1,6 +1,15 @@
-import { replaceRange } from '../str';
+import { createFilterByPattern, replaceRange } from '../str';
 
 describe('utils/str', () => {
+  describe('createFilterByPattern', () => {
+    it('should filter by pattern', () => {
+      const str = 'abcdefghijklmnopqrstuvwxyz';
+      const filter = createFilterByPattern(new RegExp('^a.*z$'));
+
+      expect(filter(str)).toEqual(true);
+    });
+  });
+
   describe('replaceRange', () => {
     it('should replace a range of text', () => {
       const str = 'a\n<here>\nc';

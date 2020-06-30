@@ -61,7 +61,8 @@ The `tasks` key is an array of tasks, the event that triggers them, and their co
 - `add-contributors`: Open a PR to modify `README.md` when a new contributor appears in a base branch
   - `base` _(string)_: the base branch
   - `file` _(string)_: the file to edit (usually `README.md`)
-  - `commitMsg` _(string)_: the [lodash template](https://lodash.com/docs#template) for the commit message; properties: `base`, `file`
+  - `commit-message` _(string)_: the [lodash template](https://lodash.com/docs#template) for the commit message; properties: `base`, `file`
+  - `exclude-pattern` _(string)_: the pattern for excluding contributors, defaults to excluding users whose usernames end in `[bot]`
 - `add-label`: Add a label to an issue
   - `label` _(string)_: the label to add
 - `add-platform-labels`: Parse issue bodies and add labels to issues that have keywords under a `Platform` header

@@ -12,12 +12,13 @@ import {
   parseMarkdownIntoSections,
 } from '../utils/markdown';
 import { parseContributors, generateContributors } from '../utils/contributors';
-import { replaceRange } from '../utils/str';
+import { createFilterByPattern, replaceRange } from '../utils/str';
 
 export interface AddContributorsConfig {
   base?: string;
   file?: string;
-  commitMsg?: string;
+  'commit-message'?: string;
+  'exclude-pattern'?: string;
 }
 
 export type AddContributorsTask = Task<
@@ -30,7 +31,8 @@ const run = async (
   {
     base = 'master',
     file = 'README.md',
-    commitMsg = 'add new contributor(s) to <%= file %>',
+    'commit-message': commitMessage = 'add new contributor(s) to <%= file %>',
+    'exclude-pattern': excludePattern = '^.+(?<!\\[bot\\])$',
   }: AddContributorsConfig,
 ) => {
   if (github.context.ref !== `refs/heads/${base}`) {
@@ -43,9 +45,11 @@ const run = async (
     `processing commits: ${commits.map((commit: any) => commit.id).join(', ')}`,
   );
 
+  const authorFilter = createFilterByPattern(new RegExp(excludePattern));
+
   const authors = commits
     .map((commit: any) => commit.author)
-    .filter((author: any) => !author.username.endsWith('[bot]'));
+    .filter((author: any) => authorFilter(author.username));
 
   if (authors.length === 0) {
     core.warning(`no human authors found for commits!`);
@@ -121,7 +125,7 @@ const run = async (
     generateContributors(allContributors),
   );
 
-  const tmpl = template(commitMsg);
+  const tmpl = template(commitMessage);
   const message = tmpl({ base, file });
 
   await writeFile(file, newContents);
