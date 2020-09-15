@@ -10,7 +10,10 @@ export interface AddLabelConfig {
 
 export type AddLabelTask = Task<'add-label', AddLabelConfig>;
 
-const run = async (client: GitHubClient, { label }: AddLabelConfig) => {
+const run = async (
+  client: GitHubClient,
+  { label }: AddLabelConfig,
+): Promise<void> => {
   await client.issues.addLabels({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,

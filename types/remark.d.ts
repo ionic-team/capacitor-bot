@@ -1,4 +1,4 @@
 declare module 'remark' {
-  var x: any;
+  let x: any;
   export = x;
 }

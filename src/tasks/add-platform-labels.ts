@@ -16,7 +16,10 @@ export type AddPlatformLabelsTask = Task<
   AddPlatformLabelsConfig
 >;
 
-const run = async (client: GitHubClient, config: AddPlatformLabelsConfig) => {
+const run = async (
+  client: GitHubClient,
+  config: AddPlatformLabelsConfig,
+): Promise<void> => {
   const { issue } = github.context.payload;
 
   if (!issue || !issue.body) {

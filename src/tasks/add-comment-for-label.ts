@@ -3,7 +3,8 @@ import * as github from '@actions/github';
 
 import type { GitHubClient } from '../client';
 import type { Task } from '../config';
-import { CreateCommentOptions, createComment } from '../utils/github';
+import type { CreateCommentOptions } from '../utils/github';
+import { createComment } from '../utils/github';
 
 export interface AddCommentForLabelConfig extends CreateCommentOptions {
   readonly name: string;
@@ -14,7 +15,10 @@ export type AddCommentForLabelTask = Task<
   AddCommentForLabelConfig
 >;
 
-const run = async (client: GitHubClient, options: AddCommentForLabelConfig) => {
+const run = async (
+  client: GitHubClient,
+  options: AddCommentForLabelConfig,
+): Promise<void> => {
   const { label } = github.context.payload;
 
   if (!label) {

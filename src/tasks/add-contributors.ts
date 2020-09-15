@@ -1,17 +1,17 @@
 import * as core from '@actions/core';
-import * as github from '@actions/github';
 import * as exec from '@actions/exec';
+import * as github from '@actions/github';
 import { readFile, writeFile } from 'fs-extra';
 import difference from 'lodash/difference';
 import template from 'lodash/fp/template';
 
 import type { GitHubClient } from '../client';
 import type { Task } from '../config';
+import { parseContributors, generateContributors } from '../utils/contributors';
 import {
   findSectionByLooseTitle,
   parseMarkdownIntoSections,
 } from '../utils/markdown';
-import { parseContributors, generateContributors } from '../utils/contributors';
 import { createFilterByPattern, replaceRange } from '../utils/str';
 
 export interface AddContributorsConfig {
@@ -34,7 +34,7 @@ const run = async (
     'commit-message': commitMessage = 'add new contributor(s) to <%= file %>',
     'exclude-pattern': excludePattern = '^.+(?<!\\[bot\\])$',
   }: AddContributorsConfig,
-) => {
+): Promise<void> => {
   if (github.context.ref !== `refs/heads/${base}`) {
     core.info(`not processing for ref: ${github.context.ref}`);
     return;

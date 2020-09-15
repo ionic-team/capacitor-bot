@@ -6,14 +6,16 @@
   "main": "dist/index.js",
   "scripts": {
     "test": "jest",
-    "fmt": "npm run prettier -- --write",
+    "lint": "npm run eslint && npm run prettier -- --check",
+    "fmt": "npm run eslint -- --fix && npm run prettier -- --write",
+    "eslint": "eslint . --ext ts",
     "prettier": "prettier 'src/**/*.ts'",
     "build": "tsc && ncc build",
     "watch": "tsc -w"
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm run prettier -- --check"
+      "pre-commit": "npm run lint"
     }
   },
   "repository": {
@@ -27,6 +29,9 @@
   },
   "homepage": "https://github.com/ionic-team/capacitor-bot#readme",
   "prettier": "@ionic/prettier-config",
+  "eslintConfig": {
+    "extends": "@ionic/eslint-config/recommended"
+  },
   "dependencies": {
     "@actions/core": "^1.2.4",
     "@actions/exec": "^1.0.4",
@@ -37,6 +42,7 @@
     "remark": "^12.0.0"
   },
   "devDependencies": {
+    "@ionic/eslint-config": "^0.3.0",
     "@ionic/prettier-config": "^1.0.0",
     "@types/fs-extra": "^9.0.1",
     "@types/jest": "^26.0.0",
@@ -44,6 +50,7 @@
     "@types/lodash": "^4.14.155",
     "@types/node": "^12.12.47",
     "@zeit/ncc": "^0.22.3",
+    "eslint": "^7.9.0",
     "jest": "^26.0.1",
     "prettier": "^2.0.5",
     "ts-jest": "^26.1.0",

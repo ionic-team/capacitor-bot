@@ -1,12 +1,13 @@
 import * as yaml from 'js-yaml';
 
-import { GitHubClient, getFileFromRepo } from './client';
+import type { GitHubClient } from './client';
+import { getFileFromRepo } from './client';
 import type { AddCommentTask } from './tasks/add-comment';
 import type { AddCommentForLabelTask } from './tasks/add-comment-for-label';
-import type { AddLabelTask } from './tasks/add-label';
-import type { RemoveLabelTask } from './tasks/remove-label';
-import type { AddPlatformLabelsTask } from './tasks/add-platform-labels';
 import type { AddContributorsTask } from './tasks/add-contributors';
+import type { AddLabelTask } from './tasks/add-label';
+import type { AddPlatformLabelsTask } from './tasks/add-platform-labels';
+import type { RemoveLabelTask } from './tasks/remove-label';
 
 export interface TriggerObject {
   readonly [key: string]:

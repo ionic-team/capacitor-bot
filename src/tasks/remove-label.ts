@@ -15,7 +15,7 @@ export type RemoveLabelTask = Task<'remove-label', RemoveLabelConfig>;
 const run = async (
   client: GitHubClient,
   { label, 'exclude-labeler': excludeLabeler = true }: RemoveLabelConfig,
-) => {
+): Promise<void> => {
   try {
     if (excludeLabeler) {
       let page = 1;

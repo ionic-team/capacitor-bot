@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import intersection from 'lodash/fp/intersection';
 
-import { Node } from './markdown';
+import type { Node } from './markdown';
 
 export const getPlatforms = (nodes: Node[]): Platform[] => {
   const platforms: Platform[] = [];

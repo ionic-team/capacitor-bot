@@ -3,10 +3,10 @@ import type { AnyTask, Task } from '../config';
 
 import addComment from './add-comment';
 import addCommentForLabel from './add-comment-for-label';
-import addLabel from './add-label';
-import removeLabel from './remove-label';
-import addPlatformLabels from './add-platform-labels';
 import addContributors from './add-contributors';
+import addLabel from './add-label';
+import addPlatformLabels from './add-platform-labels';
+import removeLabel from './remove-label';
 
 export const runTask = async (
   client: GitHubClient,
