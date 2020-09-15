@@ -40,12 +40,13 @@ tasks:
     on:
       issue_comment:
         types: [created]
+    condition: 'payload.issue.number === 1'
     config:
       label: needs-reply
       exclude-labeler: true
 ```
 
-The `tasks` key is an array of tasks, the event that triggers them, and their configuration. Notice how the `on` block is copied from the workflow file to specify exactly which events triggers which tasks.
+The `tasks` key is an array of tasks, the event that triggers them, and their configuration. Notice how the `on` block is copied from the workflow file to specify exactly which events triggers which tasks. You can also have a `condition` expression, the result of which determines if the task is run for a particular event payload.
 
 ##### Tasks
 

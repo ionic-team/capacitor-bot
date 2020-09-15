@@ -23,6 +23,7 @@ export type Trigger = string | string[] | TriggerObject;
 export interface Task<N, C> {
   readonly name: N;
   readonly on: Trigger;
+  readonly condition?: string;
   readonly config: C;
 }
 

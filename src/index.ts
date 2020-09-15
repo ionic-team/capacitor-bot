@@ -3,14 +3,12 @@ import * as github from '@actions/github';
 
 import { getClient } from './client';
 import { getConfig } from './config';
-import { runTask, createTriggeredBy } from './tasks';
+import { runTask, createTriggeredBy, evaluateCondition } from './tasks';
 
 const run = async (): Promise<void> => {
   try {
-    const {
-      eventName,
-      payload: { action },
-    } = github.context;
+    const { eventName, payload } = github.context;
+    const { action } = payload;
 
     const repoToken = core.getInput('repo-token', { required: true });
     const configPath = core.getInput('config-path', { required: true });
@@ -31,8 +29,10 @@ const run = async (): Promise<void> => {
     }
 
     for (const task of tasks) {
-      core.info(`running ${task.name} task for ${event} event`);
-      await runTask(client, task);
+      if (!task.condition || evaluateCondition(task.condition, { payload })) {
+        core.info(`running ${task.name} task for ${event} event`);
+        await runTask(client, task);
+      }
     }
   } catch (e) {
     core.error(e);
