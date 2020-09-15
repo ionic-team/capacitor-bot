@@ -452,108 +452,7 @@ function factory(key, state, ctx) {
 
 
 /***/ }),
-/* 5 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const core = __importStar(__webpack_require__(470));
-const github = __importStar(__webpack_require__(469));
-const exec = __importStar(__webpack_require__(917));
-const fs_extra_1 = __webpack_require__(226);
-const difference_1 = __importDefault(__webpack_require__(415));
-const template_1 = __importDefault(__webpack_require__(838));
-const markdown_1 = __webpack_require__(184);
-const contributors_1 = __webpack_require__(6);
-const str_1 = __webpack_require__(508);
-const run = async (client, { base = 'master', file = 'README.md', 'commit-message': commitMessage = 'add new contributor(s) to <%= file %>', 'exclude-pattern': excludePattern = '^.+(?<!\\[bot\\])$', }) => {
-    if (github.context.ref !== `refs/heads/${base}`) {
-        core.info(`not processing for ref: ${github.context.ref}`);
-        return;
-    }
-    const { commits } = github.context.payload;
-    core.info(`processing commits: ${commits.map((commit) => commit.id).join(', ')}`);
-    const authorFilter = str_1.createFilterByPattern(new RegExp(excludePattern));
-    const authors = commits
-        .map((commit) => commit.author)
-        .filter((author) => authorFilter(author.username));
-    if (authors.length === 0) {
-        core.warning(`no human authors found for commits!`);
-        return;
-    }
-    const authorUsernames = authors.map((author) => author.username);
-    core.info(`authors: ${authorUsernames.join(', ')}`);
-    const contents = await fs_extra_1.readFile(file, 'utf8');
-    const { sections } = markdown_1.parseMarkdownIntoSections(contents);
-    const section = markdown_1.findSectionByLooseTitle(sections, 'contributors');
-    if (!section) {
-        core.warning(`no contributors section in ${file}`);
-        return;
-    }
-    const startIndex = section.nodes.findIndex(n => n.type === 'html' && n.value === '<!-- CONTRIBUTORS:START -->');
-    if (startIndex === -1) {
-        core.warning('no contributors:start tag!');
-        return;
-    }
-    const htmlNode = section.nodes[startIndex + 1];
-    const contributors = contributors_1.parseContributors(htmlNode.value);
-    core.info(`current contributors: ${contributors.length > 0 ? contributors.join(', ') : 'none!'}`);
-    const newContributors = difference_1.default(authorUsernames, contributors);
-    core.info(`new contributors: ${newContributors.length > 0 ? newContributors.join(', ') : 'none!'}`);
-    if (newContributors.length == 0) {
-        return;
-    }
-    const branch = `new-contributors-${newContributors.join('-')}`;
-    let output = '';
-    await exec.exec('git', ['ls-remote', '--heads', 'origin', branch], {
-        listeners: { stdout: data => (output += data.toString()) },
-    });
-    if (output.trim()) {
-        core.warning(`branch ${branch} already exists on remote!`);
-        return;
-    }
-    const allContributors = [...newContributors, ...contributors];
-    const { start: { offset: startOffset }, end: { offset: endOffset }, } = htmlNode.position;
-    const newContents = str_1.replaceRange(contents, startOffset, endOffset, contributors_1.generateContributors(allContributors));
-    const tmpl = template_1.default(commitMessage);
-    const message = tmpl({ base, file });
-    await fs_extra_1.writeFile(file, newContents);
-    await exec.exec('git', ['checkout', '-b', branch]);
-    await exec.exec('git', ['add', file]);
-    await exec.exec('git', ['commit', '-m', message]);
-    await exec.exec('git', ['push', 'origin', branch]);
-    await client.pulls.create({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        title: 'New contributors! 💖',
-        body: `
-It looks like there are new contributors in the \`${base}\` branch!
-
-I've added the following wonderful people to \`${file}\`:
-* ${newContributors.join('\n* ')}
-
-Have a great day!
-Ionitron 💙
-`.trim(),
-        head: branch,
-        base,
-    });
-};
-exports.default = run;
-
-
-/***/ }),
+/* 5 */,
 /* 6 */
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -868,70 +767,7 @@ function wrappy (fn, cb) {
 
 /***/ }),
 /* 12 */,
-/* 13 */
-/***/ (function(module) {
-
-"use strict";
-
-
-module.exports = escapes
-
-var defaults = [
-  '\\',
-  '`',
-  '*',
-  '{',
-  '}',
-  '[',
-  ']',
-  '(',
-  ')',
-  '#',
-  '+',
-  '-',
-  '.',
-  '!',
-  '_',
-  '>'
-]
-
-var gfm = defaults.concat(['~', '|'])
-
-var commonmark = gfm.concat([
-  '\n',
-  '"',
-  '$',
-  '%',
-  '&',
-  "'",
-  ',',
-  '/',
-  ':',
-  ';',
-  '<',
-  '=',
-  '?',
-  '@',
-  '^'
-])
-
-escapes.default = defaults
-escapes.gfm = gfm
-escapes.commonmark = commonmark
-
-// Get markdown escapes.
-function escapes(options) {
-  var settings = options || {}
-
-  if (settings.commonmark) {
-    return commonmark
-  }
-
-  return settings.gfm ? gfm : defaults
-}
-
-
-/***/ }),
+/* 13 */,
 /* 14 */
 /***/ (function(module) {
 
@@ -1143,8 +979,8 @@ module.exports = new Type('tag:yaml.org,2002:map', {
 
 var fs = __webpack_require__(747)
 var polyfills = __webpack_require__(250)
-var legacy = __webpack_require__(500)
-var clone = __webpack_require__(943)
+var legacy = __webpack_require__(466)
+var clone = __webpack_require__(608)
 
 var util = __webpack_require__(669)
 
@@ -1994,15 +1830,146 @@ module.exports = baseGetTag;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
+// Adapted from https://github.com/sindresorhus/make-dir
+// Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+const fs = __webpack_require__(587)
+const path = __webpack_require__(622)
+const atLeastNode = __webpack_require__(194)
 
-var compact = __webpack_require__(218)
+const useNativeRecursiveOption = atLeastNode('10.12.0')
 
-module.exports = compile
+// https://github.com/nodejs/node/issues/8987
+// https://github.com/libuv/libuv/pull/1088
+const checkPath = pth => {
+  if (process.platform === 'win32') {
+    const pathHasInvalidWinCharacters = /[<>:"|?*]/.test(pth.replace(path.parse(pth).root, ''))
 
-// Stringify the given tree.
-function compile() {
-  return this.visit(compact(this.tree, this.options.commonmark))
+    if (pathHasInvalidWinCharacters) {
+      const error = new Error(`Path contains invalid characters: ${pth}`)
+      error.code = 'EINVAL'
+      throw error
+    }
+  }
+}
+
+const processOptions = options => {
+  const defaults = { mode: 0o777 }
+  if (typeof options === 'number') options = { mode: options }
+  return { ...defaults, ...options }
+}
+
+const permissionError = pth => {
+  // This replicates the exception of `fs.mkdir` with native the
+  // `recusive` option when run on an invalid drive under Windows.
+  const error = new Error(`operation not permitted, mkdir '${pth}'`)
+  error.code = 'EPERM'
+  error.errno = -4048
+  error.path = pth
+  error.syscall = 'mkdir'
+  return error
+}
+
+module.exports.makeDir = async (input, options) => {
+  checkPath(input)
+  options = processOptions(options)
+
+  if (useNativeRecursiveOption) {
+    const pth = path.resolve(input)
+
+    return fs.mkdir(pth, {
+      mode: options.mode,
+      recursive: true
+    })
+  }
+
+  const make = async pth => {
+    try {
+      await fs.mkdir(pth, options.mode)
+    } catch (error) {
+      if (error.code === 'EPERM') {
+        throw error
+      }
+
+      if (error.code === 'ENOENT') {
+        if (path.dirname(pth) === pth) {
+          throw permissionError(pth)
+        }
+
+        if (error.message.includes('null bytes')) {
+          throw error
+        }
+
+        await make(path.dirname(pth))
+        return make(pth)
+      }
+
+      try {
+        const stats = await fs.stat(pth)
+        if (!stats.isDirectory()) {
+          // This error is never exposed to the user
+          // it is caught below, and the original error is thrown
+          throw new Error('The path is not a directory')
+        }
+      } catch {
+        throw error
+      }
+    }
+  }
+
+  return make(path.resolve(input))
+}
+
+module.exports.makeDirSync = (input, options) => {
+  checkPath(input)
+  options = processOptions(options)
+
+  if (useNativeRecursiveOption) {
+    const pth = path.resolve(input)
+
+    return fs.mkdirSync(pth, {
+      mode: options.mode,
+      recursive: true
+    })
+  }
+
+  const make = pth => {
+    try {
+      fs.mkdirSync(pth, options.mode)
+    } catch (error) {
+      if (error.code === 'EPERM') {
+        throw error
+      }
+
+      if (error.code === 'ENOENT') {
+        if (path.dirname(pth) === pth) {
+          throw permissionError(pth)
+        }
+
+        if (error.message.includes('null bytes')) {
+          throw error
+        }
+
+        make(path.dirname(pth))
+        return make(pth)
+      }
+
+      try {
+        if (!fs.statSync(pth).isDirectory()) {
+          // This error is never exposed to the user
+          // it is caught below, and the original error is thrown
+          throw new Error('The path is not a directory')
+        }
+      } catch {
+        throw error
+      }
+    }
+  }
+
+  return make(path.resolve(input))
 }
 
 
@@ -2060,46 +2027,18 @@ module.exports = isLength;
 
 "use strict";
 
+const u = __webpack_require__(676).fromPromise
+const { makeDir: _makeDir, makeDirSync } = __webpack_require__(54)
+const makeDir = u(_makeDir)
 
-var locate = __webpack_require__(651)
-
-module.exports = hardBreak
-hardBreak.locator = locate
-
-var space = ' '
-var lineFeed = '\n'
-var minBreakLength = 2
-
-function hardBreak(eat, value, silent) {
-  var length = value.length
-  var index = -1
-  var queue = ''
-  var character
-
-  while (++index < length) {
-    character = value.charAt(index)
-
-    if (character === lineFeed) {
-      if (index < minBreakLength) {
-        return
-      }
-
-      /* istanbul ignore if - never used (yet) */
-      if (silent) {
-        return true
-      }
-
-      queue += character
-
-      return eat(queue)({type: 'break'})
-    }
-
-    if (character !== space) {
-      return
-    }
-
-    queue += character
-  }
+module.exports = {
+  mkdirs: makeDir,
+  mkdirsSync: makeDirSync,
+  // alias
+  mkdirp: makeDir,
+  mkdirpSync: makeDirSync,
+  ensureDir: makeDir,
+  ensureDirSync: makeDirSync
 }
 
 
@@ -2111,7 +2050,7 @@ function hardBreak(eat, value, silent) {
 
 
 var decimal = __webpack_require__(926)
-var alphabetical = __webpack_require__(704)
+var alphabetical = __webpack_require__(341)
 
 var plusSign = 43 // '+'
 var dash = 45 // '-'
@@ -3739,71 +3678,9 @@ module.exports = identity;
 
 
 /***/ }),
-/* 84 */
-/***/ (function(module) {
-
-"use strict";
-
-
-module.exports = factory
-
-var backslash = '\\'
-
-// Factory to de-escape a value, based on a list at `key` in `ctx`.
-function factory(ctx, key) {
-  return unescape
-
-  // De-escape a string using the expression at `key` in `ctx`.
-  function unescape(value) {
-    var previous = 0
-    var index = value.indexOf(backslash)
-    var escape = ctx[key]
-    var queue = []
-    var character
-
-    while (index !== -1) {
-      queue.push(value.slice(previous, index))
-      previous = index + 1
-      character = value.charAt(previous)
-
-      // If the following character is not a valid escape, add the slash.
-      if (!character || escape.indexOf(character) === -1) {
-        queue.push(backslash)
-      }
-
-      index = value.indexOf(backslash, previous + 1)
-    }
-
-    queue.push(value.slice(previous))
-
-    return queue.join('')
-  }
-}
-
-
-/***/ }),
+/* 84 */,
 /* 85 */,
-/* 86 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-const u = __webpack_require__(303).fromPromise
-const { makeDir: _makeDir, makeDirSync } = __webpack_require__(834)
-const makeDir = u(_makeDir)
-
-module.exports = {
-  mkdirs: makeDir,
-  mkdirsSync: makeDirSync,
-  // alias
-  mkdirp: makeDir,
-  mkdirpSync: makeDirSync,
-  ensureDir: makeDir,
-  ensureDirSync: makeDirSync
-}
-
-
-/***/ }),
+/* 86 */,
 /* 87 */
 /***/ (function(module) {
 
@@ -3934,11 +3811,11 @@ module.exports = equalArrays;
 
 const fs = __webpack_require__(25)
 const path = __webpack_require__(622)
-const copy = __webpack_require__(532).copy
+const copy = __webpack_require__(774).copy
 const remove = __webpack_require__(368).remove
-const mkdirp = __webpack_require__(86).mkdirp
-const pathExists = __webpack_require__(397).pathExists
-const stat = __webpack_require__(934)
+const mkdirp = __webpack_require__(63).mkdirp
+const pathExists = __webpack_require__(322).pathExists
+const stat = __webpack_require__(425)
 
 function move (src, dest, opts, cb) {
   if (typeof opts === 'function') {
@@ -4088,7 +3965,7 @@ module.exports = Mark;
 
 
 var xtend = __webpack_require__(940)
-var escapes = __webpack_require__(13)
+var escapes = __webpack_require__(215)
 var defaults = __webpack_require__(551)
 
 module.exports = setOptions
@@ -4142,10 +4019,10 @@ function setOptions(options) {
 
 const fs = __webpack_require__(25)
 const path = __webpack_require__(622)
-const copySync = __webpack_require__(390).copySync
+const copySync = __webpack_require__(640).copySync
 const removeSync = __webpack_require__(368).removeSync
-const mkdirpSync = __webpack_require__(86).mkdirpSync
-const stat = __webpack_require__(934)
+const mkdirpSync = __webpack_require__(63).mkdirpSync
+const stat = __webpack_require__(425)
 
 function moveSync (src, dest, opts) {
   opts = opts || {}
@@ -4220,7 +4097,7 @@ function enclose(title) {
 
 const path = __webpack_require__(622)
 const fs = __webpack_require__(25)
-const pathExists = __webpack_require__(397).pathExists
+const pathExists = __webpack_require__(322).pathExists
 
 /**
  * Function that returns two types of paths, one relative to symlink, and one
@@ -4451,7 +4328,42 @@ module.exports = value => {
 
 /***/ }),
 /* 104 */,
-/* 105 */,
+/* 105 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = visit
+
+var visitParents = __webpack_require__(882)
+
+var CONTINUE = visitParents.CONTINUE
+var SKIP = visitParents.SKIP
+var EXIT = visitParents.EXIT
+
+visit.CONTINUE = CONTINUE
+visit.SKIP = SKIP
+visit.EXIT = EXIT
+
+function visit(tree, test, visitor, reverse) {
+  if (typeof test === 'function' && typeof visitor !== 'function') {
+    reverse = visitor
+    visitor = test
+    test = null
+  }
+
+  visitParents(tree, test, overload, reverse)
+
+  function overload(node, parents) {
+    var parent = parents[parents.length - 1]
+    var index = parent ? parent.children.indexOf(node) : null
+    return visitor(node, index, parent)
+  }
+}
+
+
+/***/ }),
 /* 106 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -4500,22 +4412,209 @@ module.exports = toPath;
 "use strict";
 
 
-var alphabetical = __webpack_require__(704)
-var decimal = __webpack_require__(926)
+const fs = __webpack_require__(25)
+const path = __webpack_require__(622)
+const mkdirsSync = __webpack_require__(63).mkdirsSync
+const utimesMillisSync = __webpack_require__(916).utimesMillisSync
+const stat = __webpack_require__(425)
 
-module.exports = alphanumerical
+function copySync (src, dest, opts) {
+  if (typeof opts === 'function') {
+    opts = { filter: opts }
+  }
 
-// Check if the given character code, or the character code at the first
-// character, is alphanumerical.
-function alphanumerical(character) {
-  return alphabetical(character) || decimal(character)
+  opts = opts || {}
+  opts.clobber = 'clobber' in opts ? !!opts.clobber : true // default to true for now
+  opts.overwrite = 'overwrite' in opts ? !!opts.overwrite : opts.clobber // overwrite falls back to clobber
+
+  // Warn about using preserveTimestamps on 32-bit node
+  if (opts.preserveTimestamps && process.arch === 'ia32') {
+    console.warn(`fs-extra: Using the preserveTimestamps option in 32-bit node is not recommended;\n
+    see https://github.com/jprichardson/node-fs-extra/issues/269`)
+  }
+
+  const { srcStat, destStat } = stat.checkPathsSync(src, dest, 'copy')
+  stat.checkParentPathsSync(src, srcStat, dest, 'copy')
+  return handleFilterAndCopy(destStat, src, dest, opts)
 }
+
+function handleFilterAndCopy (destStat, src, dest, opts) {
+  if (opts.filter && !opts.filter(src, dest)) return
+  const destParent = path.dirname(dest)
+  if (!fs.existsSync(destParent)) mkdirsSync(destParent)
+  return startCopy(destStat, src, dest, opts)
+}
+
+function startCopy (destStat, src, dest, opts) {
+  if (opts.filter && !opts.filter(src, dest)) return
+  return getStats(destStat, src, dest, opts)
+}
+
+function getStats (destStat, src, dest, opts) {
+  const statSync = opts.dereference ? fs.statSync : fs.lstatSync
+  const srcStat = statSync(src)
+
+  if (srcStat.isDirectory()) return onDir(srcStat, destStat, src, dest, opts)
+  else if (srcStat.isFile() ||
+           srcStat.isCharacterDevice() ||
+           srcStat.isBlockDevice()) return onFile(srcStat, destStat, src, dest, opts)
+  else if (srcStat.isSymbolicLink()) return onLink(destStat, src, dest, opts)
+}
+
+function onFile (srcStat, destStat, src, dest, opts) {
+  if (!destStat) return copyFile(srcStat, src, dest, opts)
+  return mayCopyFile(srcStat, src, dest, opts)
+}
+
+function mayCopyFile (srcStat, src, dest, opts) {
+  if (opts.overwrite) {
+    fs.unlinkSync(dest)
+    return copyFile(srcStat, src, dest, opts)
+  } else if (opts.errorOnExist) {
+    throw new Error(`'${dest}' already exists`)
+  }
+}
+
+function copyFile (srcStat, src, dest, opts) {
+  fs.copyFileSync(src, dest)
+  if (opts.preserveTimestamps) handleTimestamps(srcStat.mode, src, dest)
+  return setDestMode(dest, srcStat.mode)
+}
+
+function handleTimestamps (srcMode, src, dest) {
+  // Make sure the file is writable before setting the timestamp
+  // otherwise open fails with EPERM when invoked with 'r+'
+  // (through utimes call)
+  if (fileIsNotWritable(srcMode)) makeFileWritable(dest, srcMode)
+  return setDestTimestamps(src, dest)
+}
+
+function fileIsNotWritable (srcMode) {
+  return (srcMode & 0o200) === 0
+}
+
+function makeFileWritable (dest, srcMode) {
+  return setDestMode(dest, srcMode | 0o200)
+}
+
+function setDestMode (dest, srcMode) {
+  return fs.chmodSync(dest, srcMode)
+}
+
+function setDestTimestamps (src, dest) {
+  // The initial srcStat.atime cannot be trusted
+  // because it is modified by the read(2) system call
+  // (See https://nodejs.org/api/fs.html#fs_stat_time_values)
+  const updatedSrcStat = fs.statSync(src)
+  return utimesMillisSync(dest, updatedSrcStat.atime, updatedSrcStat.mtime)
+}
+
+function onDir (srcStat, destStat, src, dest, opts) {
+  if (!destStat) return mkDirAndCopy(srcStat.mode, src, dest, opts)
+  if (destStat && !destStat.isDirectory()) {
+    throw new Error(`Cannot overwrite non-directory '${dest}' with directory '${src}'.`)
+  }
+  return copyDir(src, dest, opts)
+}
+
+function mkDirAndCopy (srcMode, src, dest, opts) {
+  fs.mkdirSync(dest)
+  copyDir(src, dest, opts)
+  return setDestMode(dest, srcMode)
+}
+
+function copyDir (src, dest, opts) {
+  fs.readdirSync(src).forEach(item => copyDirItem(item, src, dest, opts))
+}
+
+function copyDirItem (item, src, dest, opts) {
+  const srcItem = path.join(src, item)
+  const destItem = path.join(dest, item)
+  const { destStat } = stat.checkPathsSync(srcItem, destItem, 'copy')
+  return startCopy(destStat, srcItem, destItem, opts)
+}
+
+function onLink (destStat, src, dest, opts) {
+  let resolvedSrc = fs.readlinkSync(src)
+  if (opts.dereference) {
+    resolvedSrc = path.resolve(process.cwd(), resolvedSrc)
+  }
+
+  if (!destStat) {
+    return fs.symlinkSync(resolvedSrc, dest)
+  } else {
+    let resolvedDest
+    try {
+      resolvedDest = fs.readlinkSync(dest)
+    } catch (err) {
+      // dest exists and is a regular file or directory,
+      // Windows may throw UNKNOWN error. If dest already exists,
+      // fs throws error anyway, so no need to guard against it here.
+      if (err.code === 'EINVAL' || err.code === 'UNKNOWN') return fs.symlinkSync(resolvedSrc, dest)
+      throw err
+    }
+    if (opts.dereference) {
+      resolvedDest = path.resolve(process.cwd(), resolvedDest)
+    }
+    if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
+      throw new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`)
+    }
+
+    // prevent copy if src is a subdir of dest since unlinking
+    // dest in this case would result in removing src contents
+    // and therefore a broken symlink would be created.
+    if (fs.statSync(dest).isDirectory() && stat.isSrcSubdir(resolvedDest, resolvedSrc)) {
+      throw new Error(`Cannot overwrite '${resolvedDest}' with '${resolvedSrc}'.`)
+    }
+    return copyLink(resolvedSrc, dest)
+  }
+}
+
+function copyLink (resolvedSrc, dest) {
+  fs.unlinkSync(dest)
+  return fs.symlinkSync(resolvedSrc, dest)
+}
+
+module.exports = copySync
 
 
 /***/ }),
 /* 111 */,
 /* 112 */,
-/* 113 */,
+/* 113 */
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = label
+
+var leftSquareBracket = '['
+var rightSquareBracket = ']'
+
+var shortcut = 'shortcut'
+var collapsed = 'collapsed'
+
+// Stringify a reference label.
+// Because link references are easily, mistakingly, created (for example,
+// `[foo]`), reference nodes have an extra property depicting how it looked in
+// the original document, so stringification can cause minimal changes.
+function label(node) {
+  var type = node.referenceType
+
+  if (type === shortcut) {
+    return ''
+  }
+
+  return (
+    leftSquareBracket +
+    (type === collapsed ? '' : node.label || node.identifier) +
+    rightSquareBracket
+  )
+}
+
+
+/***/ }),
 /* 114 */,
 /* 115 */,
 /* 116 */,
@@ -4526,7 +4625,7 @@ function alphanumerical(character) {
 
 
 var whitespace = __webpack_require__(578)
-var normalize = __webpack_require__(166)
+var normalize = __webpack_require__(671)
 
 module.exports = definition
 
@@ -5124,7 +5223,33 @@ function trough() {
 /***/ }),
 /* 133 */,
 /* 134 */,
-/* 135 */,
+/* 135 */
+/***/ (function(module) {
+
+/**
+ * The base implementation of `_.sortBy` which uses `comparer` to define the
+ * sort order of `array` and replaces criteria objects with their corresponding
+ * values.
+ *
+ * @private
+ * @param {Array} array The array to sort.
+ * @param {Function} comparer The function to define sort order.
+ * @returns {Array} Returns `array`.
+ */
+function baseSortBy(array, comparer) {
+  var length = array.length;
+
+  array.sort(comparer);
+  while (length--) {
+    array[length] = array[length].value;
+  }
+  return array;
+}
+
+module.exports = baseSortBy;
+
+
+/***/ }),
 /* 136 */,
 /* 137 */,
 /* 138 */
@@ -5880,28 +6005,59 @@ module.exports = Uint8Array;
 
 
 /***/ }),
-/* 162 */,
-/* 163 */,
-/* 164 */,
-/* 165 */,
-/* 166 */
+/* 162 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
 
-var collapseWhiteSpace = __webpack_require__(724)
+var locate = __webpack_require__(651)
 
-module.exports = normalize
+module.exports = hardBreak
+hardBreak.locator = locate
 
-// Normalize an identifier.  Collapses multiple white space characters into a
-// single space, and removes casing.
-function normalize(value) {
-  return collapseWhiteSpace(value).toLowerCase()
+var space = ' '
+var lineFeed = '\n'
+var minBreakLength = 2
+
+function hardBreak(eat, value, silent) {
+  var length = value.length
+  var index = -1
+  var queue = ''
+  var character
+
+  while (++index < length) {
+    character = value.charAt(index)
+
+    if (character === lineFeed) {
+      if (index < minBreakLength) {
+        return
+      }
+
+      /* istanbul ignore if - never used (yet) */
+      if (silent) {
+        return true
+      }
+
+      queue += character
+
+      return eat(queue)({type: 'break'})
+    }
+
+    if (character !== space) {
+      return
+    }
+
+    queue += character
+  }
 }
 
 
 /***/ }),
+/* 163 */,
+/* 164 */,
+/* 165 */,
+/* 166 */,
 /* 167 */,
 /* 168 */
 /***/ (function(module) {
@@ -5951,12 +6107,7 @@ module.exports = opts => {
 
 
 /***/ }),
-/* 169 */
-/***/ (function(module) {
-
-module.exports = require("constants");
-
-/***/ }),
+/* 169 */,
 /* 170 */,
 /* 171 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -5964,7 +6115,7 @@ module.exports = require("constants");
 "use strict";
 
 
-const u = __webpack_require__(303).fromPromise
+const u = __webpack_require__(676).fromPromise
 const jsonFile = __webpack_require__(792)
 
 jsonFile.outputJson = u(__webpack_require__(695))
@@ -6223,7 +6374,23 @@ module.exports = isSymbol;
 
 
 /***/ }),
-/* 187 */,
+/* 187 */
+/***/ (function(module) {
+
+/*!
+ * Determine if an object is a Buffer
+ *
+ * @author   Feross Aboukhadijeh <https://feross.org>
+ * @license  MIT
+ */
+
+module.exports = function isBuffer (obj) {
+  return obj != null && obj.constructor != null &&
+    typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+
+/***/ }),
 /* 188 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -6351,454 +6518,12 @@ module.exports = isArrayLike;
 /***/ }),
 /* 193 */,
 /* 194 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-var trim = __webpack_require__(860)
-var repeat = __webpack_require__(8)
-var decimal = __webpack_require__(926)
-var getIndent = __webpack_require__(739)
-var removeIndent = __webpack_require__(584)
-var interrupt = __webpack_require__(853)
-
-module.exports = list
-
-var asterisk = '*'
-var underscore = '_'
-var plusSign = '+'
-var dash = '-'
-var dot = '.'
-var space = ' '
-var lineFeed = '\n'
-var tab = '\t'
-var rightParenthesis = ')'
-var lowercaseX = 'x'
-
-var tabSize = 4
-var looseListItemExpression = /\n\n(?!\s*$)/
-var taskItemExpression = /^\[([ X\tx])][ \t]/
-var bulletExpression = /^([ \t]*)([*+-]|\d+[.)])( {1,4}(?! )| |\t|$|(?=\n))([^\n]*)/
-var pedanticBulletExpression = /^([ \t]*)([*+-]|\d+[.)])([ \t]+)/
-var initialIndentExpression = /^( {1,4}|\t)?/gm
-
-function list(eat, value, silent) {
-  var self = this
-  var commonmark = self.options.commonmark
-  var pedantic = self.options.pedantic
-  var tokenizers = self.blockTokenizers
-  var interuptors = self.interruptList
-  var index = 0
-  var length = value.length
-  var start = null
-  var size
-  var queue
-  var ordered
-  var character
-  var marker
-  var nextIndex
-  var startIndex
-  var prefixed
-  var currentMarker
-  var content
-  var line
-  var previousEmpty
-  var empty
-  var items
-  var allLines
-  var emptyLines
-  var item
-  var enterTop
-  var exitBlockquote
-  var spread = false
-  var node
-  var now
-  var end
-  var indented
-
-  while (index < length) {
-    character = value.charAt(index)
-
-    if (character !== tab && character !== space) {
-      break
-    }
-
-    index++
-  }
-
-  character = value.charAt(index)
-
-  if (character === asterisk || character === plusSign || character === dash) {
-    marker = character
-    ordered = false
-  } else {
-    ordered = true
-    queue = ''
-
-    while (index < length) {
-      character = value.charAt(index)
-
-      if (!decimal(character)) {
-        break
-      }
-
-      queue += character
-      index++
-    }
-
-    character = value.charAt(index)
-
-    if (
-      !queue ||
-      !(character === dot || (commonmark && character === rightParenthesis))
-    ) {
-      return
-    }
-
-    /* Slightly abusing `silent` mode, whose goal is to make interrupting
-     * paragraphs work.
-     * Well, that’s exactly what we want to do here: don’t interrupt:
-     * 2. here, because the “list” doesn’t start with `1`. */
-    if (silent && queue !== '1') {
-      return
-    }
-
-    start = parseInt(queue, 10)
-    marker = character
-  }
-
-  character = value.charAt(++index)
-
-  if (
-    character !== space &&
-    character !== tab &&
-    (pedantic || (character !== lineFeed && character !== ''))
-  ) {
-    return
-  }
-
-  if (silent) {
-    return true
-  }
-
-  index = 0
-  items = []
-  allLines = []
-  emptyLines = []
-
-  while (index < length) {
-    nextIndex = value.indexOf(lineFeed, index)
-    startIndex = index
-    prefixed = false
-    indented = false
-
-    if (nextIndex === -1) {
-      nextIndex = length
-    }
-
-    size = 0
-
-    while (index < length) {
-      character = value.charAt(index)
-
-      if (character === tab) {
-        size += tabSize - (size % tabSize)
-      } else if (character === space) {
-        size++
-      } else {
-        break
-      }
-
-      index++
-    }
-
-    if (item && size >= item.indent) {
-      indented = true
-    }
-
-    character = value.charAt(index)
-    currentMarker = null
-
-    if (!indented) {
-      if (
-        character === asterisk ||
-        character === plusSign ||
-        character === dash
-      ) {
-        currentMarker = character
-        index++
-        size++
-      } else {
-        queue = ''
-
-        while (index < length) {
-          character = value.charAt(index)
-
-          if (!decimal(character)) {
-            break
-          }
-
-          queue += character
-          index++
-        }
-
-        character = value.charAt(index)
-        index++
-
-        if (
-          queue &&
-          (character === dot || (commonmark && character === rightParenthesis))
-        ) {
-          currentMarker = character
-          size += queue.length + 1
-        }
-      }
-
-      if (currentMarker) {
-        character = value.charAt(index)
-
-        if (character === tab) {
-          size += tabSize - (size % tabSize)
-          index++
-        } else if (character === space) {
-          end = index + tabSize
-
-          while (index < end) {
-            if (value.charAt(index) !== space) {
-              break
-            }
-
-            index++
-            size++
-          }
-
-          if (index === end && value.charAt(index) === space) {
-            index -= tabSize - 1
-            size -= tabSize - 1
-          }
-        } else if (character !== lineFeed && character !== '') {
-          currentMarker = null
-        }
-      }
-    }
-
-    if (currentMarker) {
-      if (!pedantic && marker !== currentMarker) {
-        break
-      }
-
-      prefixed = true
-    } else {
-      if (!commonmark && !indented && value.charAt(startIndex) === space) {
-        indented = true
-      } else if (commonmark && item) {
-        indented = size >= item.indent || size > tabSize
-      }
-
-      prefixed = false
-      index = startIndex
-    }
-
-    line = value.slice(startIndex, nextIndex)
-    content = startIndex === index ? line : value.slice(index, nextIndex)
-
-    if (
-      currentMarker === asterisk ||
-      currentMarker === underscore ||
-      currentMarker === dash
-    ) {
-      if (tokenizers.thematicBreak.call(self, eat, line, true)) {
-        break
-      }
-    }
-
-    previousEmpty = empty
-    empty = !prefixed && !trim(content).length
-
-    if (indented && item) {
-      item.value = item.value.concat(emptyLines, line)
-      allLines = allLines.concat(emptyLines, line)
-      emptyLines = []
-    } else if (prefixed) {
-      if (emptyLines.length !== 0) {
-        spread = true
-        item.value.push('')
-        item.trail = emptyLines.concat()
-      }
-
-      item = {
-        value: [line],
-        indent: size,
-        trail: []
-      }
-
-      items.push(item)
-      allLines = allLines.concat(emptyLines, line)
-      emptyLines = []
-    } else if (empty) {
-      if (previousEmpty && !commonmark) {
-        break
-      }
-
-      emptyLines.push(line)
-    } else {
-      if (previousEmpty) {
-        break
-      }
-
-      if (interrupt(interuptors, tokenizers, self, [eat, line, true])) {
-        break
-      }
-
-      item.value = item.value.concat(emptyLines, line)
-      allLines = allLines.concat(emptyLines, line)
-      emptyLines = []
-    }
-
-    index = nextIndex + 1
-  }
-
-  node = eat(allLines.join(lineFeed)).reset({
-    type: 'list',
-    ordered: ordered,
-    start: start,
-    spread: spread,
-    children: []
-  })
-
-  enterTop = self.enterList()
-  exitBlockquote = self.enterBlock()
-  index = -1
-  length = items.length
-
-  while (++index < length) {
-    item = items[index].value.join(lineFeed)
-    now = eat.now()
-
-    eat(item)(listItem(self, item, now), node)
-
-    item = items[index].trail.join(lineFeed)
-
-    if (index !== length - 1) {
-      item += lineFeed
-    }
-
-    eat(item)
-  }
-
-  enterTop()
-  exitBlockquote()
-
-  return node
-}
-
-function listItem(ctx, value, position) {
-  var offsets = ctx.offset
-  var fn = ctx.options.pedantic ? pedanticListItem : normalListItem
-  var checked = null
-  var task
-  var indent
-
-  value = fn.apply(null, arguments)
-
-  if (ctx.options.gfm) {
-    task = value.match(taskItemExpression)
-
-    if (task) {
-      indent = task[0].length
-      checked = task[1].toLowerCase() === lowercaseX
-      offsets[position.line] += indent
-      value = value.slice(indent)
-    }
-  }
-
-  return {
-    type: 'listItem',
-    spread: looseListItemExpression.test(value),
-    checked: checked,
-    children: ctx.tokenizeBlock(value, position)
-  }
-}
-
-// Create a list-item using overly simple mechanics.
-function pedanticListItem(ctx, value, position) {
-  var offsets = ctx.offset
-  var line = position.line
-
-  // Remove the list-item’s bullet.
-  value = value.replace(pedanticBulletExpression, replacer)
-
-  // The initial line was also matched by the below, so we reset the `line`.
-  line = position.line
-
-  return value.replace(initialIndentExpression, replacer)
-
-  // A simple replacer which removed all matches, and adds their length to
-  // `offset`.
-  function replacer($0) {
-    offsets[line] = (offsets[line] || 0) + $0.length
-    line++
-
-    return ''
-  }
-}
-
-// Create a list-item using sane mechanics.
-function normalListItem(ctx, value, position) {
-  var offsets = ctx.offset
-  var line = position.line
-  var max
-  var bullet
-  var rest
-  var lines
-  var trimmedLines
-  var index
-  var length
-
-  // Remove the list-item’s bullet.
-  value = value.replace(bulletExpression, replacer)
-
-  lines = value.split(lineFeed)
-
-  trimmedLines = removeIndent(value, getIndent(max).indent).split(lineFeed)
-
-  // We replaced the initial bullet with something else above, which was used
-  // to trick `removeIndentation` into removing some more characters when
-  // possible.  However, that could result in the initial line to be stripped
-  // more than it should be.
-  trimmedLines[0] = rest
-
-  offsets[line] = (offsets[line] || 0) + bullet.length
-  line++
-
-  index = 0
-  length = lines.length
-
-  while (++index < length) {
-    offsets[line] =
-      (offsets[line] || 0) + lines[index].length - trimmedLines[index].length
-    line++
-  }
-
-  return trimmedLines.join(lineFeed)
-
-  /* eslint-disable-next-line max-params */
-  function replacer($0, $1, $2, $3, $4) {
-    bullet = $1 + $2 + $3
-    rest = $4
-
-    // Make sure that the first nine numbered list items can indent with an
-    // extra space.  That is, when the bullet did not receive an extra final
-    // space.
-    if (Number($2) < 10 && bullet.length % 2 === 1) {
-      $2 = space + $2
-    }
-
-    max = $1 + repeat(space, $2.length) + $3
-
-    return max + rest
-  }
+/***/ (function(module) {
+
+module.exports = r => {
+  const n = process.versions.node.split('.').map(x => parseInt(x, 10))
+  r = r.split('.').map(x => parseInt(x, 10))
+  return n[0] > r[0] || (n[0] === r[0] && (n[1] > r[1] || (n[1] === r[1] && n[2] >= r[2])))
 }
 
 
@@ -6835,7 +6560,7 @@ exports.getConfig = async (client, configPath) => {
 
 var whitespace = __webpack_require__(578)
 var locate = __webpack_require__(316)
-var normalize = __webpack_require__(166)
+var normalize = __webpack_require__(671)
 
 module.exports = reference
 reference.locator = locate
@@ -7224,63 +6949,149 @@ module.exports = DataView;
 module.exports = require("https");
 
 /***/ }),
-/* 212 */,
-/* 213 */
-/***/ (function(module) {
+/* 212 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-module.exports = r => {
-  const n = process.versions.node.split('.').map(x => parseInt(x, 10))
-  r = r.split('.').map(x => parseInt(x, 10))
-  return n[0] > r[0] || (n[0] === r[0] && (n[1] > r[1] || (n[1] === r[1] && n[2] >= r[2])))
+var SetCache = __webpack_require__(405),
+    arrayIncludes = __webpack_require__(887),
+    arrayIncludesWith = __webpack_require__(655),
+    arrayMap = __webpack_require__(727),
+    baseUnary = __webpack_require__(231),
+    cacheHas = __webpack_require__(275);
+
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeMin = Math.min;
+
+/**
+ * The base implementation of methods like `_.intersection`, without support
+ * for iteratee shorthands, that accepts an array of arrays to inspect.
+ *
+ * @private
+ * @param {Array} arrays The arrays to inspect.
+ * @param {Function} [iteratee] The iteratee invoked per element.
+ * @param {Function} [comparator] The comparator invoked per element.
+ * @returns {Array} Returns the new array of shared values.
+ */
+function baseIntersection(arrays, iteratee, comparator) {
+  var includes = comparator ? arrayIncludesWith : arrayIncludes,
+      length = arrays[0].length,
+      othLength = arrays.length,
+      othIndex = othLength,
+      caches = Array(othLength),
+      maxLength = Infinity,
+      result = [];
+
+  while (othIndex--) {
+    var array = arrays[othIndex];
+    if (othIndex && iteratee) {
+      array = arrayMap(array, baseUnary(iteratee));
+    }
+    maxLength = nativeMin(array.length, maxLength);
+    caches[othIndex] = !comparator && (iteratee || (length >= 120 && array.length >= 120))
+      ? new SetCache(othIndex && array)
+      : undefined;
+  }
+  array = arrays[0];
+
+  var index = -1,
+      seen = caches[0];
+
+  outer:
+  while (++index < length && result.length < maxLength) {
+    var value = array[index],
+        computed = iteratee ? iteratee(value) : value;
+
+    value = (comparator || value !== 0) ? value : 0;
+    if (!(seen
+          ? cacheHas(seen, computed)
+          : includes(result, computed, comparator)
+        )) {
+      othIndex = othLength;
+      while (--othIndex) {
+        var cache = caches[othIndex];
+        if (!(cache
+              ? cacheHas(cache, computed)
+              : includes(arrays[othIndex], computed, comparator))
+            ) {
+          continue outer;
+        }
+      }
+      if (seen) {
+        seen.push(computed);
+      }
+      result.push(value);
+    }
+  }
+  return result;
 }
+
+module.exports = baseIntersection;
 
 
 /***/ }),
+/* 213 */,
 /* 214 */,
 /* 215 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var isSymbol = __webpack_require__(186);
+"use strict";
 
-/**
- * Compares values to sort them in ascending order.
- *
- * @private
- * @param {*} value The value to compare.
- * @param {*} other The other value to compare.
- * @returns {number} Returns the sort order indicator for `value`.
- */
-function compareAscending(value, other) {
-  if (value !== other) {
-    var valIsDefined = value !== undefined,
-        valIsNull = value === null,
-        valIsReflexive = value === value,
-        valIsSymbol = isSymbol(value);
 
-    var othIsDefined = other !== undefined,
-        othIsNull = other === null,
-        othIsReflexive = other === other,
-        othIsSymbol = isSymbol(other);
+module.exports = escapes
 
-    if ((!othIsNull && !othIsSymbol && !valIsSymbol && value > other) ||
-        (valIsSymbol && othIsDefined && othIsReflexive && !othIsNull && !othIsSymbol) ||
-        (valIsNull && othIsDefined && othIsReflexive) ||
-        (!valIsDefined && othIsReflexive) ||
-        !valIsReflexive) {
-      return 1;
-    }
-    if ((!valIsNull && !valIsSymbol && !othIsSymbol && value < other) ||
-        (othIsSymbol && valIsDefined && valIsReflexive && !valIsNull && !valIsSymbol) ||
-        (othIsNull && valIsDefined && valIsReflexive) ||
-        (!othIsDefined && valIsReflexive) ||
-        !othIsReflexive) {
-      return -1;
-    }
+var defaults = [
+  '\\',
+  '`',
+  '*',
+  '{',
+  '}',
+  '[',
+  ']',
+  '(',
+  ')',
+  '#',
+  '+',
+  '-',
+  '.',
+  '!',
+  '_',
+  '>'
+]
+
+var gfm = defaults.concat(['~', '|'])
+
+var commonmark = gfm.concat([
+  '\n',
+  '"',
+  '$',
+  '%',
+  '&',
+  "'",
+  ',',
+  '/',
+  ':',
+  ';',
+  '<',
+  '=',
+  '?',
+  '@',
+  '^'
+])
+
+escapes.default = defaults
+escapes.gfm = gfm
+escapes.commonmark = commonmark
+
+// Get markdown escapes.
+function escapes(options) {
+  var settings = options || {}
+
+  if (settings.commonmark) {
+    return commonmark
   }
-  return 0;
-}
 
-module.exports = compareAscending;
+  return settings.gfm ? gfm : defaults
+}
 
 
 /***/ }),
@@ -7289,7 +7100,7 @@ module.exports = compareAscending;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var arrayMap = __webpack_require__(727),
-    baseIntersection = __webpack_require__(830),
+    baseIntersection = __webpack_require__(212),
     baseRest = __webpack_require__(272),
     castArrayLikeObject = __webpack_require__(987);
 
@@ -7327,7 +7138,7 @@ module.exports = intersection;
 "use strict";
 
 
-var visit = __webpack_require__(872)
+var visit = __webpack_require__(105)
 
 module.exports = compact
 
@@ -7389,41 +7200,7 @@ function mergeable(node, commonmark) {
 
 
 /***/ }),
-/* 219 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var eq = __webpack_require__(338);
-
-/** Used for built-in method references. */
-var objectProto = Object.prototype;
-
-/** Used to check objects for own properties. */
-var hasOwnProperty = objectProto.hasOwnProperty;
-
-/**
- * Used by `_.defaults` to customize its `_.assignIn` use to assign properties
- * of source objects to the destination object for all destination properties
- * that resolve to `undefined`.
- *
- * @private
- * @param {*} objValue The destination value.
- * @param {*} srcValue The source value.
- * @param {string} key The key of the property to assign.
- * @param {Object} object The parent object of `objValue`.
- * @returns {*} Returns the value to assign.
- */
-function customDefaultsAssignIn(objValue, srcValue, key, object) {
-  if (objValue === undefined ||
-      (eq(objValue, objectProto[key]) && !hasOwnProperty.call(object, key))) {
-    return srcValue;
-  }
-  return objValue;
-}
-
-module.exports = customDefaultsAssignIn;
-
-
-/***/ }),
+/* 219 */,
 /* 220 */,
 /* 221 */,
 /* 222 */,
@@ -7537,16 +7314,16 @@ module.exports = {
   // Export promiseified graceful-fs:
   ...__webpack_require__(587),
   // Export extra methods:
-  ...__webpack_require__(390),
-  ...__webpack_require__(532),
+  ...__webpack_require__(640),
+  ...__webpack_require__(774),
   ...__webpack_require__(615),
   ...__webpack_require__(472),
   ...__webpack_require__(171),
-  ...__webpack_require__(86),
+  ...__webpack_require__(63),
   ...__webpack_require__(959),
   ...__webpack_require__(353),
   ...__webpack_require__(294),
-  ...__webpack_require__(397),
+  ...__webpack_require__(322),
   ...__webpack_require__(368)
 }
 
@@ -7863,7 +7640,7 @@ module.exports = baseUnary;
 
 var unherit = __webpack_require__(433)
 var xtend = __webpack_require__(940)
-var Compiler = __webpack_require__(425)
+var Compiler = __webpack_require__(597)
 
 module.exports = stringify
 stringify.Compiler = Compiler
@@ -7982,7 +7759,31 @@ function heading(node) {
 
 /***/ }),
 /* 237 */,
-/* 238 */,
+/* 238 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var path = __webpack_require__(622);
+
+function replaceExt(npath, ext) {
+  if (typeof npath !== 'string') {
+    return npath;
+  }
+
+  if (npath.length === 0) {
+    return npath;
+  }
+
+  var nFileName = path.basename(npath, path.extname(npath)) + ext;
+  return path.join(path.dirname(npath), nFileName);
+}
+
+module.exports = replaceExt;
+
+
+/***/ }),
 /* 239 */
 /***/ (function(module) {
 
@@ -8160,7 +7961,7 @@ module.exports = baseIsNative;
 /* 250 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var constants = __webpack_require__(169)
+var constants = __webpack_require__(619)
 
 var origCwd = process.cwd
 var cwd = null
@@ -8606,7 +8407,7 @@ module.exports = isStrictComparable;
 "use strict";
 
 
-var entityPrefixLength = __webpack_require__(797)
+var entityPrefixLength = __webpack_require__(630)
 
 module.exports = copy
 
@@ -9102,7 +8903,173 @@ function parseOrigin(origin) {
 
 
 /***/ }),
-/* 271 */,
+/* 271 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var xtend = __webpack_require__(940)
+var encode = __webpack_require__(447)
+var defaults = __webpack_require__(555)
+var escapeFactory = __webpack_require__(394)
+var identity = __webpack_require__(617)
+
+module.exports = setOptions
+
+// Map of applicable enums.
+var maps = {
+  entities: {true: true, false: true, numbers: true, escape: true},
+  bullet: {'*': true, '-': true, '+': true},
+  rule: {'-': true, _: true, '*': true},
+  listItemIndent: {tab: true, mixed: true, 1: true},
+  emphasis: {_: true, '*': true},
+  strong: {_: true, '*': true},
+  fence: {'`': true, '~': true}
+}
+
+// Expose `validate`.
+var validate = {
+  boolean: validateBoolean,
+  string: validateString,
+  number: validateNumber,
+  function: validateFunction
+}
+
+// Set options.  Does not overwrite previously set options.
+function setOptions(options) {
+  var self = this
+  var current = self.options
+  var ruleRepetition
+  var key
+
+  if (options == null) {
+    options = {}
+  } else if (typeof options === 'object') {
+    options = xtend(options)
+  } else {
+    throw new Error('Invalid value `' + options + '` for setting `options`')
+  }
+
+  for (key in defaults) {
+    validate[typeof defaults[key]](options, key, current[key], maps[key])
+  }
+
+  ruleRepetition = options.ruleRepetition
+
+  if (ruleRepetition && ruleRepetition < 3) {
+    raise(ruleRepetition, 'options.ruleRepetition')
+  }
+
+  self.encode = encodeFactory(String(options.entities))
+  self.escape = escapeFactory(options)
+
+  self.options = options
+
+  return self
+}
+
+// Validate a value to be boolean. Defaults to `def`.  Raises an exception with
+// `context[name]` when not a boolean.
+function validateBoolean(context, name, def) {
+  var value = context[name]
+
+  if (value == null) {
+    value = def
+  }
+
+  if (typeof value !== 'boolean') {
+    raise(value, 'options.' + name)
+  }
+
+  context[name] = value
+}
+
+// Validate a value to be boolean. Defaults to `def`.  Raises an exception with
+// `context[name]` when not a boolean.
+function validateNumber(context, name, def) {
+  var value = context[name]
+
+  if (value == null) {
+    value = def
+  }
+
+  if (isNaN(value)) {
+    raise(value, 'options.' + name)
+  }
+
+  context[name] = value
+}
+
+// Validate a value to be in `map`. Defaults to `def`.  Raises an exception
+// with `context[name]` when not in `map`.
+function validateString(context, name, def, map) {
+  var value = context[name]
+
+  if (value == null) {
+    value = def
+  }
+
+  value = String(value)
+
+  if (!(value in map)) {
+    raise(value, 'options.' + name)
+  }
+
+  context[name] = value
+}
+
+// Validate a value to be function. Defaults to `def`.  Raises an exception
+// with `context[name]` when not a function.
+function validateFunction(context, name, def) {
+  var value = context[name]
+
+  if (value == null) {
+    value = def
+  }
+
+  if (typeof value !== 'function') {
+    raise(value, 'options.' + name)
+  }
+
+  context[name] = value
+}
+
+// Factory to encode HTML entities.  Creates a no-operation function when
+// `type` is `'false'`, a function which encodes using named references when
+// `type` is `'true'`, and a function which encodes using numbered references
+// when `type` is `'numbers'`.
+function encodeFactory(type) {
+  var options = {}
+
+  if (type === 'false') {
+    return identity
+  }
+
+  if (type === 'true') {
+    options.useNamedReferences = true
+  }
+
+  if (type === 'escape') {
+    options.escapeOnly = true
+    options.useNamedReferences = true
+  }
+
+  return wrapped
+
+  // Encode HTML entities using the bound options.
+  function wrapped(value) {
+    return encode(value, options)
+  }
+}
+
+// Throw an exception with in its `message` `value` and `name`.
+function raise(value, name) {
+  throw new Error('Invalid value `' + value + '` for setting `' + name + '`')
+}
+
+
+/***/ }),
 /* 272 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -9158,7 +9125,7 @@ var legacy = __webpack_require__(177)
 var invalid = __webpack_require__(793)
 var decimal = __webpack_require__(926)
 var hexadecimal = __webpack_require__(928)
-var alphanumerical = __webpack_require__(110)
+var alphanumerical = __webpack_require__(874)
 var decodeEntity = __webpack_require__(737)
 
 module.exports = parseEntities
@@ -9613,163 +9580,88 @@ function disallowed(code) {
 "use strict";
 
 
-var xtend = __webpack_require__(940)
-var encode = __webpack_require__(447)
-var defaults = __webpack_require__(555)
-var escapeFactory = __webpack_require__(394)
-var identity = __webpack_require__(617)
+var trim = __webpack_require__(860)
+var whitespace = __webpack_require__(578)
+var locate = __webpack_require__(350)
 
-module.exports = setOptions
+module.exports = strong
+strong.locator = locate
 
-// Map of applicable enums.
-var maps = {
-  entities: {true: true, false: true, numbers: true, escape: true},
-  bullet: {'*': true, '-': true, '+': true},
-  rule: {'-': true, _: true, '*': true},
-  listItemIndent: {tab: true, mixed: true, 1: true},
-  emphasis: {_: true, '*': true},
-  strong: {_: true, '*': true},
-  fence: {'`': true, '~': true}
-}
+var backslash = '\\'
+var asterisk = '*'
+var underscore = '_'
 
-// Expose `validate`.
-var validate = {
-  boolean: validateBoolean,
-  string: validateString,
-  number: validateNumber,
-  function: validateFunction
-}
-
-// Set options.  Does not overwrite previously set options.
-function setOptions(options) {
+function strong(eat, value, silent) {
   var self = this
-  var current = self.options
-  var ruleRepetition
-  var key
+  var index = 0
+  var character = value.charAt(index)
+  var now
+  var pedantic
+  var marker
+  var queue
+  var subvalue
+  var length
+  var previous
 
-  if (options == null) {
-    options = {}
-  } else if (typeof options === 'object') {
-    options = xtend(options)
-  } else {
-    throw new Error('Invalid value `' + options + '` for setting `options`')
+  if (
+    (character !== asterisk && character !== underscore) ||
+    value.charAt(++index) !== character
+  ) {
+    return
   }
 
-  for (key in defaults) {
-    validate[typeof defaults[key]](options, key, current[key], maps[key])
+  pedantic = self.options.pedantic
+  marker = character
+  subvalue = marker + marker
+  length = value.length
+  index++
+  queue = ''
+  character = ''
+
+  if (pedantic && whitespace(value.charAt(index))) {
+    return
   }
 
-  ruleRepetition = options.ruleRepetition
+  while (index < length) {
+    previous = character
+    character = value.charAt(index)
 
-  if (ruleRepetition && ruleRepetition < 3) {
-    raise(ruleRepetition, 'options.ruleRepetition')
+    if (
+      character === marker &&
+      value.charAt(index + 1) === marker &&
+      (!pedantic || !whitespace(previous))
+    ) {
+      character = value.charAt(index + 2)
+
+      if (character !== marker) {
+        if (!trim(queue)) {
+          return
+        }
+
+        /* istanbul ignore if - never used (yet) */
+        if (silent) {
+          return true
+        }
+
+        now = eat.now()
+        now.column += 2
+        now.offset += 2
+
+        return eat(subvalue + queue + subvalue)({
+          type: 'strong',
+          children: self.tokenizeInline(queue, now)
+        })
+      }
+    }
+
+    if (!pedantic && character === backslash) {
+      queue += character
+      character = value.charAt(++index)
+    }
+
+    queue += character
+    index++
   }
-
-  self.encode = encodeFactory(String(options.entities))
-  self.escape = escapeFactory(options)
-
-  self.options = options
-
-  return self
-}
-
-// Validate a value to be boolean. Defaults to `def`.  Raises an exception with
-// `context[name]` when not a boolean.
-function validateBoolean(context, name, def) {
-  var value = context[name]
-
-  if (value == null) {
-    value = def
-  }
-
-  if (typeof value !== 'boolean') {
-    raise(value, 'options.' + name)
-  }
-
-  context[name] = value
-}
-
-// Validate a value to be boolean. Defaults to `def`.  Raises an exception with
-// `context[name]` when not a boolean.
-function validateNumber(context, name, def) {
-  var value = context[name]
-
-  if (value == null) {
-    value = def
-  }
-
-  if (isNaN(value)) {
-    raise(value, 'options.' + name)
-  }
-
-  context[name] = value
-}
-
-// Validate a value to be in `map`. Defaults to `def`.  Raises an exception
-// with `context[name]` when not in `map`.
-function validateString(context, name, def, map) {
-  var value = context[name]
-
-  if (value == null) {
-    value = def
-  }
-
-  value = String(value)
-
-  if (!(value in map)) {
-    raise(value, 'options.' + name)
-  }
-
-  context[name] = value
-}
-
-// Validate a value to be function. Defaults to `def`.  Raises an exception
-// with `context[name]` when not a function.
-function validateFunction(context, name, def) {
-  var value = context[name]
-
-  if (value == null) {
-    value = def
-  }
-
-  if (typeof value !== 'function') {
-    raise(value, 'options.' + name)
-  }
-
-  context[name] = value
-}
-
-// Factory to encode HTML entities.  Creates a no-operation function when
-// `type` is `'false'`, a function which encodes using named references when
-// `type` is `'true'`, and a function which encodes using numbered references
-// when `type` is `'numbers'`.
-function encodeFactory(type) {
-  var options = {}
-
-  if (type === 'false') {
-    return identity
-  }
-
-  if (type === 'true') {
-    options.useNamedReferences = true
-  }
-
-  if (type === 'escape') {
-    options.escapeOnly = true
-    options.useNamedReferences = true
-  }
-
-  return wrapped
-
-  // Encode HTML entities using the bound options.
-  function wrapped(value) {
-    return encode(value, options)
-  }
-}
-
-// Throw an exception with in its `message` `value` and `name`.
-function raise(value, name) {
-  throw new Error('Invalid value `' + value + '` for setting `' + name + '`')
 }
 
 
@@ -11263,7 +11155,26 @@ function coerce (version) {
 
 
 /***/ }),
-/* 281 */,
+/* 281 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseForOwn = __webpack_require__(920),
+    createBaseEach = __webpack_require__(919);
+
+/**
+ * The base implementation of `_.forEach` without support for iteratee shorthands.
+ *
+ * @private
+ * @param {Array|Object} collection The collection to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Array|Object} Returns `collection`.
+ */
+var baseEach = createBaseEach(baseForOwn);
+
+module.exports = baseEach;
+
+
+/***/ }),
 /* 282 */,
 /* 283 */
 /***/ (function(module) {
@@ -11479,11 +11390,11 @@ module.exports = baseSetToString;
 "use strict";
 
 
-const u = __webpack_require__(303).fromCallback
+const u = __webpack_require__(676).fromCallback
 const fs = __webpack_require__(25)
 const path = __webpack_require__(622)
-const mkdir = __webpack_require__(86)
-const pathExists = __webpack_require__(397).pathExists
+const mkdir = __webpack_require__(63)
+const pathExists = __webpack_require__(322).pathExists
 
 function outputFile (file, data, encoding, callback) {
   if (typeof encoding === 'function') {
@@ -11742,36 +11653,7 @@ module.exports = isArrayLikeObject;
 
 /***/ }),
 /* 302 */,
-/* 303 */
-/***/ (function(__unusedmodule, exports) {
-
-"use strict";
-
-
-exports.fromCallback = function (fn) {
-  return Object.defineProperty(function (...args) {
-    if (typeof args[args.length - 1] === 'function') fn.apply(this, args)
-    else {
-      return new Promise((resolve, reject) => {
-        fn.apply(
-          this,
-          args.concat([(err, res) => err ? reject(err) : resolve(res)])
-        )
-      })
-    }
-  }, 'name', { value: fn.name })
-}
-
-exports.fromPromise = function (fn) {
-  return Object.defineProperty(function (...args) {
-    const cb = args[args.length - 1]
-    if (typeof cb !== 'function') return fn.apply(this, args)
-    else fn.apply(this, args.slice(0, -1)).then(r => cb(null, r), cb)
-  }, 'name', { value: fn.name })
-}
-
-
-/***/ }),
+/* 303 */,
 /* 304 */
 /***/ (function(module) {
 
@@ -11921,7 +11803,78 @@ module.exports = hasPath;
 
 /***/ }),
 /* 311 */,
-/* 312 */,
+/* 312 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var uri = __webpack_require__(188)
+var title = __webpack_require__(96)
+
+module.exports = link
+
+var space = ' '
+var leftSquareBracket = '['
+var rightSquareBracket = ']'
+var leftParenthesis = '('
+var rightParenthesis = ')'
+
+// Expression for a protocol:
+// See <https://en.wikipedia.org/wiki/Uniform_Resource_Identifier#Generic_syntax>.
+var protocol = /^[a-z][a-z+.-]+:\/?/i
+
+// Stringify a link.
+//
+// When no title exists, the compiled `children` equal `url`, and `url` starts
+// with a protocol, an auto link is created:
+//
+// ```markdown
+// <http://example.com>
+// ```
+//
+// Otherwise, is smart about enclosing `url` (see `encloseURI()`) and `title`
+// (see `encloseTitle()`).
+// ```
+//
+// ```markdown
+// [foo](<foo at bar dot com> 'An "example" e-mail')
+// ```
+//
+// Supports named entities in the `url` and `title` when in `settings.encode`
+// mode.
+function link(node) {
+  var self = this
+  var content = self.encode(node.url || '', node)
+  var exit = self.enterLink()
+  var escaped = self.encode(self.escape(node.url || '', node))
+  var value = self.all(node).join('')
+
+  exit()
+
+  if (node.title == null && protocol.test(content) && escaped === value) {
+    // Backslash escapes do not work in autolinks, so we do not escape.
+    return uri(self.encode(node.url), true)
+  }
+
+  content = uri(content)
+
+  if (node.title) {
+    content += space + title(self.encode(self.escape(node.title, node), node))
+  }
+
+  return (
+    leftSquareBracket +
+    value +
+    rightSquareBracket +
+    leftParenthesis +
+    content +
+    rightParenthesis
+  )
+}
+
+
+/***/ }),
 /* 313 */,
 /* 314 */,
 /* 315 */
@@ -12010,7 +11963,7 @@ module.exports = getNative;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var copyObject = __webpack_require__(875),
-    createAssigner = __webpack_require__(533),
+    createAssigner = __webpack_require__(797),
     keysIn = __webpack_require__(971);
 
 /**
@@ -12055,89 +12008,16 @@ module.exports = assignInWith;
 
 "use strict";
 
+const u = __webpack_require__(676).fromPromise
+const fs = __webpack_require__(587)
 
-var trim = __webpack_require__(860)
-var whitespace = __webpack_require__(578)
-var locate = __webpack_require__(350)
+function pathExists (path) {
+  return fs.access(path).then(() => true).catch(() => false)
+}
 
-module.exports = strong
-strong.locator = locate
-
-var backslash = '\\'
-var asterisk = '*'
-var underscore = '_'
-
-function strong(eat, value, silent) {
-  var self = this
-  var index = 0
-  var character = value.charAt(index)
-  var now
-  var pedantic
-  var marker
-  var queue
-  var subvalue
-  var length
-  var previous
-
-  if (
-    (character !== asterisk && character !== underscore) ||
-    value.charAt(++index) !== character
-  ) {
-    return
-  }
-
-  pedantic = self.options.pedantic
-  marker = character
-  subvalue = marker + marker
-  length = value.length
-  index++
-  queue = ''
-  character = ''
-
-  if (pedantic && whitespace(value.charAt(index))) {
-    return
-  }
-
-  while (index < length) {
-    previous = character
-    character = value.charAt(index)
-
-    if (
-      character === marker &&
-      value.charAt(index + 1) === marker &&
-      (!pedantic || !whitespace(previous))
-    ) {
-      character = value.charAt(index + 2)
-
-      if (character !== marker) {
-        if (!trim(queue)) {
-          return
-        }
-
-        /* istanbul ignore if - never used (yet) */
-        if (silent) {
-          return true
-        }
-
-        now = eat.now()
-        now.column += 2
-        now.offset += 2
-
-        return eat(subvalue + queue + subvalue)({
-          type: 'strong',
-          children: self.tokenizeInline(queue, now)
-        })
-      }
-    }
-
-    if (!pedantic && character === backslash) {
-      queue += character
-      character = value.charAt(++index)
-    }
-
-    queue += character
-    index++
-  }
+module.exports = {
+  pathExists: u(pathExists),
+  pathExistsSync: fs.existsSync
 }
 
 
@@ -12456,7 +12336,7 @@ function table(eat, value, silent) {
 
 
 var copy = __webpack_require__(259)
-var label = __webpack_require__(466)
+var label = __webpack_require__(113)
 
 module.exports = linkReference
 
@@ -12645,24 +12525,23 @@ module.exports = eq;
 /* 339 */,
 /* 340 */,
 /* 341 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var baseFor = __webpack_require__(843),
-    keys = __webpack_require__(863);
+"use strict";
 
-/**
- * The base implementation of `_.forOwn` without support for iteratee shorthands.
- *
- * @private
- * @param {Object} object The object to iterate over.
- * @param {Function} iteratee The function invoked per iteration.
- * @returns {Object} Returns `object`.
- */
-function baseForOwn(object, iteratee) {
-  return object && baseFor(object, iteratee, keys);
+
+module.exports = alphabetical
+
+// Check if the given character code, or the character code at the first
+// character, is alphabetical.
+function alphabetical(character) {
+  var code = typeof character === 'string' ? character.charCodeAt(0) : character
+
+  return (
+    (code >= 97 && code <= 122) /* a-z */ ||
+    (code >= 65 && code <= 90) /* A-Z */
+  )
 }
-
-module.exports = baseForOwn;
 
 
 /***/ }),
@@ -12740,9 +12619,9 @@ module.exports = getMapData;
 var ccount = __webpack_require__(126)
 var decode = __webpack_require__(277)
 var decimal = __webpack_require__(926)
-var alphabetical = __webpack_require__(704)
+var alphabetical = __webpack_require__(341)
 var whitespace = __webpack_require__(578)
-var locate = __webpack_require__(716)
+var locate = __webpack_require__(545)
 
 module.exports = url
 url.locator = locate
@@ -13136,7 +13015,7 @@ module.exports = basePropertyDeep;
 "use strict";
 
 
-const u = __webpack_require__(303).fromCallback
+const u = __webpack_require__(676).fromCallback
 module.exports = {
   move: u(__webpack_require__(92))
 }
@@ -13399,7 +13278,7 @@ function locate(value, fromIndex) {
 "use strict";
 
 
-const u = __webpack_require__(303).fromCallback
+const u = __webpack_require__(676).fromCallback
 const rimraf = __webpack_require__(474)
 
 module.exports = {
@@ -14395,12 +14274,73 @@ module.exports = readShebang;
 /* 390 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
+var SetCache = __webpack_require__(405),
+    arrayIncludes = __webpack_require__(887),
+    arrayIncludesWith = __webpack_require__(655),
+    arrayMap = __webpack_require__(727),
+    baseUnary = __webpack_require__(231),
+    cacheHas = __webpack_require__(275);
 
+/** Used as the size to enable large array optimizations. */
+var LARGE_ARRAY_SIZE = 200;
 
-module.exports = {
-  copySync: __webpack_require__(708)
+/**
+ * The base implementation of methods like `_.difference` without support
+ * for excluding multiple arrays or iteratee shorthands.
+ *
+ * @private
+ * @param {Array} array The array to inspect.
+ * @param {Array} values The values to exclude.
+ * @param {Function} [iteratee] The iteratee invoked per element.
+ * @param {Function} [comparator] The comparator invoked per element.
+ * @returns {Array} Returns the new array of filtered values.
+ */
+function baseDifference(array, values, iteratee, comparator) {
+  var index = -1,
+      includes = arrayIncludes,
+      isCommon = true,
+      length = array.length,
+      result = [],
+      valuesLength = values.length;
+
+  if (!length) {
+    return result;
+  }
+  if (iteratee) {
+    values = arrayMap(values, baseUnary(iteratee));
+  }
+  if (comparator) {
+    includes = arrayIncludesWith;
+    isCommon = false;
+  }
+  else if (values.length >= LARGE_ARRAY_SIZE) {
+    includes = cacheHas;
+    isCommon = false;
+    values = new SetCache(values);
+  }
+  outer:
+  while (++index < length) {
+    var value = array[index],
+        computed = iteratee == null ? value : iteratee(value);
+
+    value = (comparator || value !== 0) ? value : 0;
+    if (isCommon && computed === computed) {
+      var valuesIndex = valuesLength;
+      while (valuesIndex--) {
+        if (values[valuesIndex] === computed) {
+          continue outer;
+        }
+      }
+      result.push(value);
+    }
+    else if (!includes(values, computed, comparator)) {
+      result.push(value);
+    }
+  }
+  return result;
 }
+
+module.exports = baseDifference;
 
 
 /***/ }),
@@ -14436,8 +14376,8 @@ module.exports = overArg;
 var decimal = __webpack_require__(926)
 var alphanumeric = __webpack_require__(721)
 var whitespace = __webpack_require__(578)
-var escapes = __webpack_require__(13)
-var prefix = __webpack_require__(797)
+var escapes = __webpack_require__(215)
+var prefix = __webpack_require__(630)
 
 module.exports = factory
 
@@ -14744,25 +14684,7 @@ module.exports = coreJsData;
 
 
 /***/ }),
-/* 397 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-const u = __webpack_require__(303).fromPromise
-const fs = __webpack_require__(587)
-
-function pathExists (path) {
-  return fs.access(path).then(() => true).catch(() => false)
-}
-
-module.exports = {
-  pathExists: u(pathExists),
-  pathExistsSync: fs.existsSync
-}
-
-
-/***/ }),
+/* 397 */,
 /* 398 */,
 /* 399 */,
 /* 400 */,
@@ -14889,13 +14811,13 @@ module.exports = isBuffer;
 var assignInWith = __webpack_require__(321),
     attempt = __webpack_require__(297),
     baseValues = __webpack_require__(378),
-    customDefaultsAssignIn = __webpack_require__(219),
+    customDefaultsAssignIn = __webpack_require__(730),
     escapeStringChar = __webpack_require__(909),
     isError = __webpack_require__(570),
     isIterateeCall = __webpack_require__(663),
     keys = __webpack_require__(863),
     reInterpolate = __webpack_require__(699),
-    templateSettings = __webpack_require__(859),
+    templateSettings = __webpack_require__(716),
     toString = __webpack_require__(428);
 
 /** Used to match empty string literals in compiled template source. */
@@ -15257,7 +15179,7 @@ module.exports = yaml;
 /* 415 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseDifference = __webpack_require__(807),
+var baseDifference = __webpack_require__(390),
     baseFlatten = __webpack_require__(496),
     baseRest = __webpack_require__(272),
     isArrayLikeObject = __webpack_require__(301);
@@ -15487,63 +15409,142 @@ module.exports = Set;
 "use strict";
 
 
-var xtend = __webpack_require__(940)
-var toggle = __webpack_require__(4)
+const fs = __webpack_require__(587)
+const path = __webpack_require__(622)
+const util = __webpack_require__(669)
+const atLeastNode = __webpack_require__(194)
 
-module.exports = Compiler
+const nodeSupportsBigInt = atLeastNode('10.5.0')
+const stat = (file) => nodeSupportsBigInt ? fs.stat(file, { bigint: true }) : fs.stat(file)
+const statSync = (file) => nodeSupportsBigInt ? fs.statSync(file, { bigint: true }) : fs.statSync(file)
 
-// Construct a new compiler.
-function Compiler(tree, file) {
-  this.inLink = false
-  this.inTable = false
-  this.tree = tree
-  this.file = file
-  this.options = xtend(this.options)
-  this.setOptions({})
+function getStats (src, dest) {
+  return Promise.all([
+    stat(src),
+    stat(dest).catch(err => {
+      if (err.code === 'ENOENT') return null
+      throw err
+    })
+  ]).then(([srcStat, destStat]) => ({ srcStat, destStat }))
 }
 
-var proto = Compiler.prototype
+function getStatsSync (src, dest) {
+  let destStat
+  const srcStat = statSync(src)
+  try {
+    destStat = statSync(dest)
+  } catch (err) {
+    if (err.code === 'ENOENT') return { srcStat, destStat: null }
+    throw err
+  }
+  return { srcStat, destStat }
+}
 
-// Enter and exit helpers. */
-proto.enterLink = toggle('inLink', false)
-proto.enterTable = toggle('inTable', false)
-proto.enterLinkReference = __webpack_require__(172)
+function checkPaths (src, dest, funcName, cb) {
+  util.callbackify(getStats)(src, dest, (err, stats) => {
+    if (err) return cb(err)
+    const { srcStat, destStat } = stats
+    if (destStat && areIdentical(srcStat, destStat)) {
+      return cb(new Error('Source and destination must not be the same.'))
+    }
+    if (srcStat.isDirectory() && isSrcSubdir(src, dest)) {
+      return cb(new Error(errMsg(src, dest, funcName)))
+    }
+    return cb(null, { srcStat, destStat })
+  })
+}
 
-// Configuration.
-proto.options = __webpack_require__(555)
-proto.setOptions = __webpack_require__(279)
+function checkPathsSync (src, dest, funcName) {
+  const { srcStat, destStat } = getStatsSync(src, dest)
+  if (destStat && areIdentical(srcStat, destStat)) {
+    throw new Error('Source and destination must not be the same.')
+  }
+  if (srcStat.isDirectory() && isSrcSubdir(src, dest)) {
+    throw new Error(errMsg(src, dest, funcName))
+  }
+  return { srcStat, destStat }
+}
 
-proto.compile = __webpack_require__(54)
-proto.visit = __webpack_require__(690)
-proto.all = __webpack_require__(203)
-proto.block = __webpack_require__(304)
-proto.visitOrderedItems = __webpack_require__(594)
-proto.visitUnorderedItems = __webpack_require__(668)
+// recursively check if dest parent is a subdirectory of src.
+// It works for all file types including symlinks since it
+// checks the src and dest inodes. It starts from the deepest
+// parent and stops once it reaches the src parent or the root path.
+function checkParentPaths (src, srcStat, dest, funcName, cb) {
+  const srcParent = path.resolve(path.dirname(src))
+  const destParent = path.resolve(path.dirname(dest))
+  if (destParent === srcParent || destParent === path.parse(destParent).root) return cb()
+  const callback = (err, destStat) => {
+    if (err) {
+      if (err.code === 'ENOENT') return cb()
+      return cb(err)
+    }
+    if (areIdentical(srcStat, destStat)) {
+      return cb(new Error(errMsg(src, dest, funcName)))
+    }
+    return checkParentPaths(src, srcStat, destParent, funcName, cb)
+  }
+  if (nodeSupportsBigInt) fs.stat(destParent, { bigint: true }, callback)
+  else fs.stat(destParent, callback)
+}
 
-// Expose visitors.
-proto.visitors = {
-  root: __webpack_require__(128),
-  text: __webpack_require__(543),
-  heading: __webpack_require__(236),
-  paragraph: __webpack_require__(174),
-  blockquote: __webpack_require__(676),
-  list: __webpack_require__(209),
-  listItem: __webpack_require__(355),
-  inlineCode: __webpack_require__(712),
-  code: __webpack_require__(935),
-  html: __webpack_require__(139),
-  thematicBreak: __webpack_require__(688),
-  strong: __webpack_require__(411),
-  emphasis: __webpack_require__(576),
-  break: __webpack_require__(972),
-  delete: __webpack_require__(120),
-  link: __webpack_require__(640),
-  linkReference: __webpack_require__(331),
-  imageReference: __webpack_require__(764),
-  definition: __webpack_require__(459),
-  image: __webpack_require__(333),
-  table: __webpack_require__(884),
-  tableCell: __webpack_require__(151)
+function checkParentPathsSync (src, srcStat, dest, funcName) {
+  const srcParent = path.resolve(path.dirname(src))
+  const destParent = path.resolve(path.dirname(dest))
+  if (destParent === srcParent || destParent === path.parse(destParent).root) return
+  let destStat
+  try {
+    destStat = statSync(destParent)
+  } catch (err) {
+    if (err.code === 'ENOENT') return
+    throw err
+  }
+  if (areIdentical(srcStat, destStat)) {
+    throw new Error(errMsg(src, dest, funcName))
+  }
+  return checkParentPathsSync(src, srcStat, destParent, funcName)
+}
+
+function areIdentical (srcStat, destStat) {
+  if (destStat.ino && destStat.dev && destStat.ino === srcStat.ino && destStat.dev === srcStat.dev) {
+    if (nodeSupportsBigInt || destStat.ino < Number.MAX_SAFE_INTEGER) {
+      // definitive answer
+      return true
+    }
+    // Use additional heuristics if we can't use 'bigint'.
+    // Different 'ino' could be represented the same if they are >= Number.MAX_SAFE_INTEGER
+    // See issue 657
+    if (destStat.size === srcStat.size &&
+        destStat.mode === srcStat.mode &&
+        destStat.nlink === srcStat.nlink &&
+        destStat.atimeMs === srcStat.atimeMs &&
+        destStat.mtimeMs === srcStat.mtimeMs &&
+        destStat.ctimeMs === srcStat.ctimeMs &&
+        destStat.birthtimeMs === srcStat.birthtimeMs) {
+      // heuristic answer
+      return true
+    }
+  }
+  return false
+}
+
+// return true if dest is a subdir of src, otherwise false.
+// It only checks the path strings.
+function isSrcSubdir (src, dest) {
+  const srcArr = path.resolve(src).split(path.sep).filter(i => i)
+  const destArr = path.resolve(dest).split(path.sep).filter(i => i)
+  return srcArr.reduce((acc, cur, i) => acc && destArr[i] === cur, true)
+}
+
+function errMsg (src, dest, funcName) {
+  return `Cannot ${funcName} '${src}' to a subdirectory of itself, '${dest}'.`
+}
+
+module.exports = {
+  checkPaths,
+  checkPathsSync,
+  checkParentPaths,
+  checkParentPathsSync,
+  isSrcSubdir
 }
 
 
@@ -15861,76 +15862,7 @@ function unherit(Super) {
 
 /***/ }),
 /* 434 */,
-/* 435 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const u = __webpack_require__(303).fromCallback
-const path = __webpack_require__(622)
-const fs = __webpack_require__(25)
-const _mkdirs = __webpack_require__(86)
-const mkdirs = _mkdirs.mkdirs
-const mkdirsSync = _mkdirs.mkdirsSync
-
-const _symlinkPaths = __webpack_require__(97)
-const symlinkPaths = _symlinkPaths.symlinkPaths
-const symlinkPathsSync = _symlinkPaths.symlinkPathsSync
-
-const _symlinkType = __webpack_require__(975)
-const symlinkType = _symlinkType.symlinkType
-const symlinkTypeSync = _symlinkType.symlinkTypeSync
-
-const pathExists = __webpack_require__(397).pathExists
-
-function createSymlink (srcpath, dstpath, type, callback) {
-  callback = (typeof type === 'function') ? type : callback
-  type = (typeof type === 'function') ? false : type
-
-  pathExists(dstpath, (err, destinationExists) => {
-    if (err) return callback(err)
-    if (destinationExists) return callback(null)
-    symlinkPaths(srcpath, dstpath, (err, relative) => {
-      if (err) return callback(err)
-      srcpath = relative.toDst
-      symlinkType(relative.toCwd, type, (err, type) => {
-        if (err) return callback(err)
-        const dir = path.dirname(dstpath)
-        pathExists(dir, (err, dirExists) => {
-          if (err) return callback(err)
-          if (dirExists) return fs.symlink(srcpath, dstpath, type, callback)
-          mkdirs(dir, err => {
-            if (err) return callback(err)
-            fs.symlink(srcpath, dstpath, type, callback)
-          })
-        })
-      })
-    })
-  })
-}
-
-function createSymlinkSync (srcpath, dstpath, type) {
-  const destinationExists = fs.existsSync(dstpath)
-  if (destinationExists) return undefined
-
-  const relative = symlinkPathsSync(srcpath, dstpath)
-  srcpath = relative.toDst
-  type = symlinkTypeSync(relative.toCwd, type)
-  const dir = path.dirname(dstpath)
-  const exists = fs.existsSync(dir)
-  if (exists) return fs.symlinkSync(srcpath, dstpath, type)
-  mkdirsSync(dir)
-  return fs.symlinkSync(srcpath, dstpath, type)
-}
-
-module.exports = {
-  createSymlink: u(createSymlink),
-  createSymlinkSync
-}
-
-
-/***/ }),
+/* 435 */,
 /* 436 */,
 /* 437 */
 /***/ (function(module) {
@@ -16321,7 +16253,7 @@ module.exports = ary;
 "use strict";
 
 
-var alphabetical = __webpack_require__(704)
+var alphabetical = __webpack_require__(341)
 var locate = __webpack_require__(725)
 var tag = __webpack_require__(234).tag
 
@@ -16391,7 +16323,7 @@ var entities = __webpack_require__(437)
 var legacy = __webpack_require__(177)
 var hexadecimal = __webpack_require__(928)
 var decimal = __webpack_require__(926)
-var alphanumerical = __webpack_require__(110)
+var alphanumerical = __webpack_require__(874)
 var dangerous = __webpack_require__(957)
 
 module.exports = encode
@@ -18573,7 +18505,7 @@ module.exports = updateWrapDetails;
 var xtend = __webpack_require__(940)
 var toggle = __webpack_require__(4)
 var vfileLocation = __webpack_require__(684)
-var unescape = __webpack_require__(84)
+var unescape = __webpack_require__(795)
 var decode = __webpack_require__(536)
 var tokenizer = __webpack_require__(886)
 
@@ -18666,14 +18598,14 @@ proto.interruptBlockquote = [
 // Handlers.
 proto.blockTokenizers = {
   blankLine: __webpack_require__(506),
-  indentedCode: __webpack_require__(849),
+  indentedCode: __webpack_require__(830),
   fencedCode: __webpack_require__(442),
   blockquote: __webpack_require__(705),
   atxHeading: __webpack_require__(758),
   thematicBreak: __webpack_require__(880),
-  list: __webpack_require__(194),
+  list: __webpack_require__(951),
   setextHeading: __webpack_require__(803),
-  html: __webpack_require__(717),
+  html: __webpack_require__(804),
   definition: __webpack_require__(117),
   table: __webpack_require__(325),
   paragraph: __webpack_require__(157)
@@ -18687,11 +18619,11 @@ proto.inlineTokenizers = {
   html: __webpack_require__(446),
   link: __webpack_require__(79),
   reference: __webpack_require__(196),
-  strong: __webpack_require__(322),
+  strong: __webpack_require__(279),
   emphasis: __webpack_require__(77),
   deletion: __webpack_require__(284),
   code: __webpack_require__(784),
-  break: __webpack_require__(63),
+  break: __webpack_require__(162),
   text: __webpack_require__(15)
 }
 
@@ -18926,8 +18858,8 @@ exports.RequestError = RequestError;
 
 
 var path = __webpack_require__(622)
-var replace = __webpack_require__(730)
-var buffer = __webpack_require__(619)
+var replace = __webpack_require__(238)
+var buffer = __webpack_require__(187)
 
 module.exports = VFile
 
@@ -19097,35 +19029,125 @@ function assertPath(path, name) {
 
 /***/ }),
 /* 466 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
+var Stream = __webpack_require__(794).Stream
 
+module.exports = legacy
 
-module.exports = label
-
-var leftSquareBracket = '['
-var rightSquareBracket = ']'
-
-var shortcut = 'shortcut'
-var collapsed = 'collapsed'
-
-// Stringify a reference label.
-// Because link references are easily, mistakingly, created (for example,
-// `[foo]`), reference nodes have an extra property depicting how it looked in
-// the original document, so stringification can cause minimal changes.
-function label(node) {
-  var type = node.referenceType
-
-  if (type === shortcut) {
-    return ''
+function legacy (fs) {
+  return {
+    ReadStream: ReadStream,
+    WriteStream: WriteStream
   }
 
-  return (
-    leftSquareBracket +
-    (type === collapsed ? '' : node.label || node.identifier) +
-    rightSquareBracket
-  )
+  function ReadStream (path, options) {
+    if (!(this instanceof ReadStream)) return new ReadStream(path, options);
+
+    Stream.call(this);
+
+    var self = this;
+
+    this.path = path;
+    this.fd = null;
+    this.readable = true;
+    this.paused = false;
+
+    this.flags = 'r';
+    this.mode = 438; /*=0666*/
+    this.bufferSize = 64 * 1024;
+
+    options = options || {};
+
+    // Mixin options into this
+    var keys = Object.keys(options);
+    for (var index = 0, length = keys.length; index < length; index++) {
+      var key = keys[index];
+      this[key] = options[key];
+    }
+
+    if (this.encoding) this.setEncoding(this.encoding);
+
+    if (this.start !== undefined) {
+      if ('number' !== typeof this.start) {
+        throw TypeError('start must be a Number');
+      }
+      if (this.end === undefined) {
+        this.end = Infinity;
+      } else if ('number' !== typeof this.end) {
+        throw TypeError('end must be a Number');
+      }
+
+      if (this.start > this.end) {
+        throw new Error('start must be <= end');
+      }
+
+      this.pos = this.start;
+    }
+
+    if (this.fd !== null) {
+      process.nextTick(function() {
+        self._read();
+      });
+      return;
+    }
+
+    fs.open(this.path, this.flags, this.mode, function (err, fd) {
+      if (err) {
+        self.emit('error', err);
+        self.readable = false;
+        return;
+      }
+
+      self.fd = fd;
+      self.emit('open', fd);
+      self._read();
+    })
+  }
+
+  function WriteStream (path, options) {
+    if (!(this instanceof WriteStream)) return new WriteStream(path, options);
+
+    Stream.call(this);
+
+    this.path = path;
+    this.fd = null;
+    this.writable = true;
+
+    this.flags = 'w';
+    this.encoding = 'binary';
+    this.mode = 438; /*=0666*/
+    this.bytesWritten = 0;
+
+    options = options || {};
+
+    // Mixin options into this
+    var keys = Object.keys(options);
+    for (var index = 0, length = keys.length; index < length; index++) {
+      var key = keys[index];
+      this[key] = options[key];
+    }
+
+    if (this.start !== undefined) {
+      if ('number' !== typeof this.start) {
+        throw TypeError('start must be a Number');
+      }
+      if (this.start < 0) {
+        throw new Error('start must be >= zero');
+      }
+
+      this.pos = this.start;
+    }
+
+    this.busy = false;
+    this._queue = [];
+
+    if (this.fd === null) {
+      this._open = fs.open;
+      this._queue.push([this._open, this.path, this.flags, this.mode, undefined]);
+      this.flush();
+    }
+  }
 }
 
 
@@ -19421,7 +19443,7 @@ exports.getState = getState;
 
 const file = __webpack_require__(665)
 const link = __webpack_require__(900)
-const symlink = __webpack_require__(435)
+const symlink = __webpack_require__(849)
 
 module.exports = {
   // file
@@ -20061,124 +20083,239 @@ module.exports = Symbol;
 /* 500 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var Stream = __webpack_require__(794).Stream
+"use strict";
 
-module.exports = legacy
 
-function legacy (fs) {
-  return {
-    ReadStream: ReadStream,
-    WriteStream: WriteStream
+const fs = __webpack_require__(25)
+const path = __webpack_require__(622)
+const mkdirs = __webpack_require__(63).mkdirs
+const pathExists = __webpack_require__(322).pathExists
+const utimesMillis = __webpack_require__(916).utimesMillis
+const stat = __webpack_require__(425)
+
+function copy (src, dest, opts, cb) {
+  if (typeof opts === 'function' && !cb) {
+    cb = opts
+    opts = {}
+  } else if (typeof opts === 'function') {
+    opts = { filter: opts }
   }
 
-  function ReadStream (path, options) {
-    if (!(this instanceof ReadStream)) return new ReadStream(path, options);
+  cb = cb || function () {}
+  opts = opts || {}
 
-    Stream.call(this);
+  opts.clobber = 'clobber' in opts ? !!opts.clobber : true // default to true for now
+  opts.overwrite = 'overwrite' in opts ? !!opts.overwrite : opts.clobber // overwrite falls back to clobber
 
-    var self = this;
+  // Warn about using preserveTimestamps on 32-bit node
+  if (opts.preserveTimestamps && process.arch === 'ia32') {
+    console.warn(`fs-extra: Using the preserveTimestamps option in 32-bit node is not recommended;\n
+    see https://github.com/jprichardson/node-fs-extra/issues/269`)
+  }
 
-    this.path = path;
-    this.fd = null;
-    this.readable = true;
-    this.paused = false;
+  stat.checkPaths(src, dest, 'copy', (err, stats) => {
+    if (err) return cb(err)
+    const { srcStat, destStat } = stats
+    stat.checkParentPaths(src, srcStat, dest, 'copy', err => {
+      if (err) return cb(err)
+      if (opts.filter) return handleFilter(checkParentDir, destStat, src, dest, opts, cb)
+      return checkParentDir(destStat, src, dest, opts, cb)
+    })
+  })
+}
 
-    this.flags = 'r';
-    this.mode = 438; /*=0666*/
-    this.bufferSize = 64 * 1024;
+function checkParentDir (destStat, src, dest, opts, cb) {
+  const destParent = path.dirname(dest)
+  pathExists(destParent, (err, dirExists) => {
+    if (err) return cb(err)
+    if (dirExists) return startCopy(destStat, src, dest, opts, cb)
+    mkdirs(destParent, err => {
+      if (err) return cb(err)
+      return startCopy(destStat, src, dest, opts, cb)
+    })
+  })
+}
 
-    options = options || {};
+function handleFilter (onInclude, destStat, src, dest, opts, cb) {
+  Promise.resolve(opts.filter(src, dest)).then(include => {
+    if (include) return onInclude(destStat, src, dest, opts, cb)
+    return cb()
+  }, error => cb(error))
+}
 
-    // Mixin options into this
-    var keys = Object.keys(options);
-    for (var index = 0, length = keys.length; index < length; index++) {
-      var key = keys[index];
-      this[key] = options[key];
-    }
+function startCopy (destStat, src, dest, opts, cb) {
+  if (opts.filter) return handleFilter(getStats, destStat, src, dest, opts, cb)
+  return getStats(destStat, src, dest, opts, cb)
+}
 
-    if (this.encoding) this.setEncoding(this.encoding);
+function getStats (destStat, src, dest, opts, cb) {
+  const stat = opts.dereference ? fs.stat : fs.lstat
+  stat(src, (err, srcStat) => {
+    if (err) return cb(err)
 
-    if (this.start !== undefined) {
-      if ('number' !== typeof this.start) {
-        throw TypeError('start must be a Number');
-      }
-      if (this.end === undefined) {
-        this.end = Infinity;
-      } else if ('number' !== typeof this.end) {
-        throw TypeError('end must be a Number');
-      }
+    if (srcStat.isDirectory()) return onDir(srcStat, destStat, src, dest, opts, cb)
+    else if (srcStat.isFile() ||
+             srcStat.isCharacterDevice() ||
+             srcStat.isBlockDevice()) return onFile(srcStat, destStat, src, dest, opts, cb)
+    else if (srcStat.isSymbolicLink()) return onLink(destStat, src, dest, opts, cb)
+  })
+}
 
-      if (this.start > this.end) {
-        throw new Error('start must be <= end');
-      }
+function onFile (srcStat, destStat, src, dest, opts, cb) {
+  if (!destStat) return copyFile(srcStat, src, dest, opts, cb)
+  return mayCopyFile(srcStat, src, dest, opts, cb)
+}
 
-      this.pos = this.start;
-    }
+function mayCopyFile (srcStat, src, dest, opts, cb) {
+  if (opts.overwrite) {
+    fs.unlink(dest, err => {
+      if (err) return cb(err)
+      return copyFile(srcStat, src, dest, opts, cb)
+    })
+  } else if (opts.errorOnExist) {
+    return cb(new Error(`'${dest}' already exists`))
+  } else return cb()
+}
 
-    if (this.fd !== null) {
-      process.nextTick(function() {
-        self._read();
-      });
-      return;
-    }
+function copyFile (srcStat, src, dest, opts, cb) {
+  fs.copyFile(src, dest, err => {
+    if (err) return cb(err)
+    if (opts.preserveTimestamps) return handleTimestampsAndMode(srcStat.mode, src, dest, cb)
+    return setDestMode(dest, srcStat.mode, cb)
+  })
+}
 
-    fs.open(this.path, this.flags, this.mode, function (err, fd) {
-      if (err) {
-        self.emit('error', err);
-        self.readable = false;
-        return;
-      }
-
-      self.fd = fd;
-      self.emit('open', fd);
-      self._read();
+function handleTimestampsAndMode (srcMode, src, dest, cb) {
+  // Make sure the file is writable before setting the timestamp
+  // otherwise open fails with EPERM when invoked with 'r+'
+  // (through utimes call)
+  if (fileIsNotWritable(srcMode)) {
+    return makeFileWritable(dest, srcMode, err => {
+      if (err) return cb(err)
+      return setDestTimestampsAndMode(srcMode, src, dest, cb)
     })
   }
-
-  function WriteStream (path, options) {
-    if (!(this instanceof WriteStream)) return new WriteStream(path, options);
-
-    Stream.call(this);
-
-    this.path = path;
-    this.fd = null;
-    this.writable = true;
-
-    this.flags = 'w';
-    this.encoding = 'binary';
-    this.mode = 438; /*=0666*/
-    this.bytesWritten = 0;
-
-    options = options || {};
-
-    // Mixin options into this
-    var keys = Object.keys(options);
-    for (var index = 0, length = keys.length; index < length; index++) {
-      var key = keys[index];
-      this[key] = options[key];
-    }
-
-    if (this.start !== undefined) {
-      if ('number' !== typeof this.start) {
-        throw TypeError('start must be a Number');
-      }
-      if (this.start < 0) {
-        throw new Error('start must be >= zero');
-      }
-
-      this.pos = this.start;
-    }
-
-    this.busy = false;
-    this._queue = [];
-
-    if (this.fd === null) {
-      this._open = fs.open;
-      this._queue.push([this._open, this.path, this.flags, this.mode, undefined]);
-      this.flush();
-    }
-  }
+  return setDestTimestampsAndMode(srcMode, src, dest, cb)
 }
+
+function fileIsNotWritable (srcMode) {
+  return (srcMode & 0o200) === 0
+}
+
+function makeFileWritable (dest, srcMode, cb) {
+  return setDestMode(dest, srcMode | 0o200, cb)
+}
+
+function setDestTimestampsAndMode (srcMode, src, dest, cb) {
+  setDestTimestamps(src, dest, err => {
+    if (err) return cb(err)
+    return setDestMode(dest, srcMode, cb)
+  })
+}
+
+function setDestMode (dest, srcMode, cb) {
+  return fs.chmod(dest, srcMode, cb)
+}
+
+function setDestTimestamps (src, dest, cb) {
+  // The initial srcStat.atime cannot be trusted
+  // because it is modified by the read(2) system call
+  // (See https://nodejs.org/api/fs.html#fs_stat_time_values)
+  fs.stat(src, (err, updatedSrcStat) => {
+    if (err) return cb(err)
+    return utimesMillis(dest, updatedSrcStat.atime, updatedSrcStat.mtime, cb)
+  })
+}
+
+function onDir (srcStat, destStat, src, dest, opts, cb) {
+  if (!destStat) return mkDirAndCopy(srcStat.mode, src, dest, opts, cb)
+  if (destStat && !destStat.isDirectory()) {
+    return cb(new Error(`Cannot overwrite non-directory '${dest}' with directory '${src}'.`))
+  }
+  return copyDir(src, dest, opts, cb)
+}
+
+function mkDirAndCopy (srcMode, src, dest, opts, cb) {
+  fs.mkdir(dest, err => {
+    if (err) return cb(err)
+    copyDir(src, dest, opts, err => {
+      if (err) return cb(err)
+      return setDestMode(dest, srcMode, cb)
+    })
+  })
+}
+
+function copyDir (src, dest, opts, cb) {
+  fs.readdir(src, (err, items) => {
+    if (err) return cb(err)
+    return copyDirItems(items, src, dest, opts, cb)
+  })
+}
+
+function copyDirItems (items, src, dest, opts, cb) {
+  const item = items.pop()
+  if (!item) return cb()
+  return copyDirItem(items, item, src, dest, opts, cb)
+}
+
+function copyDirItem (items, item, src, dest, opts, cb) {
+  const srcItem = path.join(src, item)
+  const destItem = path.join(dest, item)
+  stat.checkPaths(srcItem, destItem, 'copy', (err, stats) => {
+    if (err) return cb(err)
+    const { destStat } = stats
+    startCopy(destStat, srcItem, destItem, opts, err => {
+      if (err) return cb(err)
+      return copyDirItems(items, src, dest, opts, cb)
+    })
+  })
+}
+
+function onLink (destStat, src, dest, opts, cb) {
+  fs.readlink(src, (err, resolvedSrc) => {
+    if (err) return cb(err)
+    if (opts.dereference) {
+      resolvedSrc = path.resolve(process.cwd(), resolvedSrc)
+    }
+
+    if (!destStat) {
+      return fs.symlink(resolvedSrc, dest, cb)
+    } else {
+      fs.readlink(dest, (err, resolvedDest) => {
+        if (err) {
+          // dest exists and is a regular file or directory,
+          // Windows may throw UNKNOWN error. If dest already exists,
+          // fs throws error anyway, so no need to guard against it here.
+          if (err.code === 'EINVAL' || err.code === 'UNKNOWN') return fs.symlink(resolvedSrc, dest, cb)
+          return cb(err)
+        }
+        if (opts.dereference) {
+          resolvedDest = path.resolve(process.cwd(), resolvedDest)
+        }
+        if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
+          return cb(new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`))
+        }
+
+        // do not copy if src is a subdir of dest since unlinking
+        // dest in this case would result in removing src contents
+        // and therefore a broken symlink would be created.
+        if (destStat.isDirectory() && stat.isSrcSubdir(resolvedDest, resolvedSrc)) {
+          return cb(new Error(`Cannot overwrite '${resolvedDest}' with '${resolvedSrc}'.`))
+        }
+        return copyLink(resolvedSrc, dest, cb)
+      })
+    }
+  })
+}
+
+function copyLink (resolvedSrc, dest, cb) {
+  fs.unlink(dest, err => {
+    if (err) return cb(err)
+    return fs.symlink(resolvedSrc, dest, cb)
+  })
+}
+
+module.exports = copy
 
 
 /***/ }),
@@ -20222,10 +20359,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const add_comment_1 = __importDefault(__webpack_require__(627));
 const add_comment_for_label_1 = __importDefault(__webpack_require__(475));
+const add_contributors_1 = __importDefault(__webpack_require__(659));
 const add_label_1 = __importDefault(__webpack_require__(286));
-const remove_label_1 = __importDefault(__webpack_require__(599));
 const add_platform_labels_1 = __importDefault(__webpack_require__(243));
-const add_contributors_1 = __importDefault(__webpack_require__(5));
+const remove_label_1 = __importDefault(__webpack_require__(599));
 exports.runTask = async (client, task) => {
     switch (task.name) {
         case 'add-comment':
@@ -21143,62 +21280,8 @@ module.exports = toInteger;
 /* 529 */,
 /* 530 */,
 /* 531 */,
-/* 532 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const u = __webpack_require__(303).fromCallback
-module.exports = {
-  copy: u(__webpack_require__(826))
-}
-
-
-/***/ }),
-/* 533 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var baseRest = __webpack_require__(272),
-    isIterateeCall = __webpack_require__(663);
-
-/**
- * Creates a function like `_.assign`.
- *
- * @private
- * @param {Function} assigner The function to assign values.
- * @returns {Function} Returns the new assigner function.
- */
-function createAssigner(assigner) {
-  return baseRest(function(object, sources) {
-    var index = -1,
-        length = sources.length,
-        customizer = length > 1 ? sources[length - 1] : undefined,
-        guard = length > 2 ? sources[2] : undefined;
-
-    customizer = (assigner.length > 3 && typeof customizer == 'function')
-      ? (length--, customizer)
-      : undefined;
-
-    if (guard && isIterateeCall(sources[0], sources[1], guard)) {
-      customizer = length < 3 ? undefined : customizer;
-      length = 1;
-    }
-    object = Object(object);
-    while (++index < length) {
-      var source = sources[index];
-      if (source) {
-        assigner(object, source, index, customizer);
-      }
-    }
-    return object;
-  });
-}
-
-module.exports = createAssigner;
-
-
-/***/ }),
+/* 532 */,
+/* 533 */,
 /* 534 */,
 /* 535 */,
 /* 536 */
@@ -21994,7 +22077,42 @@ function text(node, parent) {
 
 /***/ }),
 /* 544 */,
-/* 545 */,
+/* 545 */
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = locate
+
+var values = ['www.', 'http://', 'https://']
+
+function locate(value, fromIndex) {
+  var min = -1
+  var index
+  var length
+  var position
+
+  if (!this.options.gfm) {
+    return min
+  }
+
+  length = values.length
+  index = -1
+
+  while (++index < length) {
+    position = value.indexOf(values[index], fromIndex)
+
+    if (position !== -1 && (min === -1 || position < min)) {
+      min = position
+    }
+  }
+
+  return min
+}
+
+
+/***/ }),
 /* 546 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -22094,7 +22212,7 @@ module.exports = {
 /* 552 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var compareAscending = __webpack_require__(215);
+var compareAscending = __webpack_require__(694);
 
 /**
  * Used by `_.orderBy` to compare multiple properties of a value to another
@@ -22490,7 +22608,7 @@ module.exports = parse;
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 var baseFlatten = __webpack_require__(496),
-    baseOrderBy = __webpack_require__(608),
+    baseOrderBy = __webpack_require__(844),
     baseRest = __webpack_require__(272),
     isIterateeCall = __webpack_require__(663);
 
@@ -22980,7 +23098,7 @@ module.exports = equalObjects;
 
 // This is adapted from https://github.com/normalize/mz
 // Copyright (c) 2014-2016 Jonathan Ong me@jongleberry.com and Contributors
-const u = __webpack_require__(303).fromCallback
+const u = __webpack_require__(676).fromCallback
 const fs = __webpack_require__(25)
 
 const api = [
@@ -23329,7 +23447,73 @@ module.exports = stackDelete;
 
 /***/ }),
 /* 596 */,
-/* 597 */,
+/* 597 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var xtend = __webpack_require__(940)
+var toggle = __webpack_require__(4)
+
+module.exports = Compiler
+
+// Construct a new compiler.
+function Compiler(tree, file) {
+  this.inLink = false
+  this.inTable = false
+  this.tree = tree
+  this.file = file
+  this.options = xtend(this.options)
+  this.setOptions({})
+}
+
+var proto = Compiler.prototype
+
+// Enter and exit helpers. */
+proto.enterLink = toggle('inLink', false)
+proto.enterTable = toggle('inTable', false)
+proto.enterLinkReference = __webpack_require__(172)
+
+// Configuration.
+proto.options = __webpack_require__(555)
+proto.setOptions = __webpack_require__(271)
+
+proto.compile = __webpack_require__(918)
+proto.visit = __webpack_require__(690)
+proto.all = __webpack_require__(203)
+proto.block = __webpack_require__(304)
+proto.visitOrderedItems = __webpack_require__(594)
+proto.visitUnorderedItems = __webpack_require__(668)
+
+// Expose visitors.
+proto.visitors = {
+  root: __webpack_require__(128),
+  text: __webpack_require__(543),
+  heading: __webpack_require__(236),
+  paragraph: __webpack_require__(174),
+  blockquote: __webpack_require__(990),
+  list: __webpack_require__(209),
+  listItem: __webpack_require__(355),
+  inlineCode: __webpack_require__(712),
+  code: __webpack_require__(935),
+  html: __webpack_require__(139),
+  thematicBreak: __webpack_require__(688),
+  strong: __webpack_require__(411),
+  emphasis: __webpack_require__(576),
+  break: __webpack_require__(972),
+  delete: __webpack_require__(120),
+  link: __webpack_require__(312),
+  linkReference: __webpack_require__(331),
+  imageReference: __webpack_require__(764),
+  definition: __webpack_require__(459),
+  image: __webpack_require__(333),
+  table: __webpack_require__(884),
+  tableCell: __webpack_require__(151)
+}
+
+
+/***/ }),
 /* 598 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -23381,7 +23565,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
-const sortBy_1 = __importDefault(__webpack_require__(774));
+const sortBy_1 = __importDefault(__webpack_require__(828));
 const run = async (client, { label, 'exclude-labeler': excludeLabeler = true }) => {
     try {
         if (excludeLabeler) {
@@ -23497,42 +23681,28 @@ module.exports = require("http");
 /* 606 */,
 /* 607 */,
 /* 608 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
-var arrayMap = __webpack_require__(727),
-    baseIteratee = __webpack_require__(354),
-    baseMap = __webpack_require__(852),
-    baseSortBy = __webpack_require__(671),
-    baseUnary = __webpack_require__(231),
-    compareMultiple = __webpack_require__(552),
-    identity = __webpack_require__(83);
+"use strict";
 
-/**
- * The base implementation of `_.orderBy` without param guards.
- *
- * @private
- * @param {Array|Object} collection The collection to iterate over.
- * @param {Function[]|Object[]|string[]} iteratees The iteratees to sort by.
- * @param {string[]} orders The sort orders of `iteratees`.
- * @returns {Array} Returns the new sorted array.
- */
-function baseOrderBy(collection, iteratees, orders) {
-  var index = -1;
-  iteratees = arrayMap(iteratees.length ? iteratees : [identity], baseUnary(baseIteratee));
 
-  var result = baseMap(collection, function(value, key, collection) {
-    var criteria = arrayMap(iteratees, function(iteratee) {
-      return iteratee(value);
-    });
-    return { 'criteria': criteria, 'index': ++index, 'value': value };
-  });
+module.exports = clone
 
-  return baseSortBy(result, function(object, other) {
-    return compareMultiple(object, other, orders);
-  });
+function clone (obj) {
+  if (obj === null || typeof obj !== 'object')
+    return obj
+
+  if (obj instanceof Object)
+    var copy = { __proto__: obj.__proto__ }
+  else
+    var copy = Object.create(null)
+
+  Object.getOwnPropertyNames(obj).forEach(function (key) {
+    Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(obj, key))
+  })
+
+  return copy
 }
-
-module.exports = baseOrderBy;
 
 
 /***/ }),
@@ -23622,10 +23792,10 @@ module.exports = require("events");
 "use strict";
 
 
-const u = __webpack_require__(303).fromCallback
+const u = __webpack_require__(676).fromCallback
 const fs = __webpack_require__(25)
 const path = __webpack_require__(622)
-const mkdir = __webpack_require__(86)
+const mkdir = __webpack_require__(63)
 const remove = __webpack_require__(368)
 
 const emptyDir = u(function emptyDir (dir, callback) {
@@ -23726,18 +23896,7 @@ function identity(value) {
 /* 619 */
 /***/ (function(module) {
 
-/*!
- * Determine if an object is a Buffer
- *
- * @author   Feross Aboukhadijeh <https://feross.org>
- * @license  MIT
- */
-
-module.exports = function isBuffer (obj) {
-  return obj != null && obj.constructor != null &&
-    typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
-}
-
+module.exports = require("constants");
 
 /***/ }),
 /* 620 */
@@ -23879,7 +24038,36 @@ module.exports = baseAssign;
 
 
 /***/ }),
-/* 630 */,
+/* 630 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var decode = __webpack_require__(277)
+
+module.exports = length
+
+var ampersand = '&'
+
+// Returns the length of HTML entity that is a prefix of the given string
+// (excluding the ampersand), 0 if it does not start with an entity.
+function length(value) {
+  var prefix
+
+  /* istanbul ignore if - Currently also tested for at implemention, but we
+   * keep it here because that’s proper. */
+  if (value.charAt(0) !== ampersand) {
+    return 0
+  }
+
+  prefix = value.split(ampersand, 2).join(ampersand)
+
+  return prefix.length - decode(prefix).length
+}
+
+
+/***/ }),
 /* 631 */
 /***/ (function(module) {
 
@@ -23942,68 +24130,8 @@ module.exports = hashDelete;
 "use strict";
 
 
-var uri = __webpack_require__(188)
-var title = __webpack_require__(96)
-
-module.exports = link
-
-var space = ' '
-var leftSquareBracket = '['
-var rightSquareBracket = ']'
-var leftParenthesis = '('
-var rightParenthesis = ')'
-
-// Expression for a protocol:
-// See <https://en.wikipedia.org/wiki/Uniform_Resource_Identifier#Generic_syntax>.
-var protocol = /^[a-z][a-z+.-]+:\/?/i
-
-// Stringify a link.
-//
-// When no title exists, the compiled `children` equal `url`, and `url` starts
-// with a protocol, an auto link is created:
-//
-// ```markdown
-// <http://example.com>
-// ```
-//
-// Otherwise, is smart about enclosing `url` (see `encloseURI()`) and `title`
-// (see `encloseTitle()`).
-// ```
-//
-// ```markdown
-// [foo](<foo at bar dot com> 'An "example" e-mail')
-// ```
-//
-// Supports named entities in the `url` and `title` when in `settings.encode`
-// mode.
-function link(node) {
-  var self = this
-  var content = self.encode(node.url || '', node)
-  var exit = self.enterLink()
-  var escaped = self.encode(self.escape(node.url || '', node))
-  var value = self.all(node).join('')
-
-  exit()
-
-  if (node.title == null && protocol.test(content) && escaped === value) {
-    // Backslash escapes do not work in autolinks, so we do not escape.
-    return uri(self.encode(node.url), true)
-  }
-
-  content = uri(content)
-
-  if (node.title) {
-    content += space + title(self.encode(self.escape(node.title, node), node))
-  }
-
-  return (
-    leftSquareBracket +
-    value +
-    rightSquareBracket +
-    leftParenthesis +
-    content +
-    rightParenthesis
-  )
+module.exports = {
+  copySync: __webpack_require__(110)
 }
 
 
@@ -24066,7 +24194,7 @@ var buffer = __webpack_require__(263)
 var extend = __webpack_require__(374)
 var plain = __webpack_require__(103)
 var trough = __webpack_require__(132)
-var vfile = __webpack_require__(659)
+var vfile = __webpack_require__(872)
 
 // Expose a frozen processor.
 module.exports = unified().freeze()
@@ -24656,58 +24784,104 @@ module.exports = arrayIncludesWith;
 /* 657 */,
 /* 658 */,
 /* 659 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
 "use strict";
 
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const exec = __importStar(__webpack_require__(917));
+const github = __importStar(__webpack_require__(469));
+const fs_extra_1 = __webpack_require__(226);
+const difference_1 = __importDefault(__webpack_require__(415));
+const template_1 = __importDefault(__webpack_require__(838));
+const contributors_1 = __webpack_require__(6);
+const markdown_1 = __webpack_require__(184);
+const str_1 = __webpack_require__(508);
+const run = async (client, { base = 'master', file = 'README.md', 'commit-message': commitMessage = 'add new contributor(s) to <%= file %>', 'exclude-pattern': excludePattern = '^.+(?<!\\[bot\\])$', }) => {
+    if (github.context.ref !== `refs/heads/${base}`) {
+        core.info(`not processing for ref: ${github.context.ref}`);
+        return;
+    }
+    const { commits } = github.context.payload;
+    core.info(`processing commits: ${commits.map((commit) => commit.id).join(', ')}`);
+    const authorFilter = str_1.createFilterByPattern(new RegExp(excludePattern));
+    const authors = commits
+        .map((commit) => commit.author)
+        .filter((author) => authorFilter(author.username));
+    if (authors.length === 0) {
+        core.warning(`no human authors found for commits!`);
+        return;
+    }
+    const authorUsernames = authors.map((author) => author.username);
+    core.info(`authors: ${authorUsernames.join(', ')}`);
+    const contents = await fs_extra_1.readFile(file, 'utf8');
+    const { sections } = markdown_1.parseMarkdownIntoSections(contents);
+    const section = markdown_1.findSectionByLooseTitle(sections, 'contributors');
+    if (!section) {
+        core.warning(`no contributors section in ${file}`);
+        return;
+    }
+    const startIndex = section.nodes.findIndex(n => n.type === 'html' && n.value === '<!-- CONTRIBUTORS:START -->');
+    if (startIndex === -1) {
+        core.warning('no contributors:start tag!');
+        return;
+    }
+    const htmlNode = section.nodes[startIndex + 1];
+    const contributors = contributors_1.parseContributors(htmlNode.value);
+    core.info(`current contributors: ${contributors.length > 0 ? contributors.join(', ') : 'none!'}`);
+    const newContributors = difference_1.default(authorUsernames, contributors);
+    core.info(`new contributors: ${newContributors.length > 0 ? newContributors.join(', ') : 'none!'}`);
+    if (newContributors.length == 0) {
+        return;
+    }
+    const branch = `new-contributors-${newContributors.join('-')}`;
+    let output = '';
+    await exec.exec('git', ['ls-remote', '--heads', 'origin', branch], {
+        listeners: { stdout: data => (output += data.toString()) },
+    });
+    if (output.trim()) {
+        core.warning(`branch ${branch} already exists on remote!`);
+        return;
+    }
+    const allContributors = [...newContributors, ...contributors];
+    const { start: { offset: startOffset }, end: { offset: endOffset }, } = htmlNode.position;
+    const newContents = str_1.replaceRange(contents, startOffset, endOffset, contributors_1.generateContributors(allContributors));
+    const tmpl = template_1.default(commitMessage);
+    const message = tmpl({ base, file });
+    await fs_extra_1.writeFile(file, newContents);
+    await exec.exec('git', ['checkout', '-b', branch]);
+    await exec.exec('git', ['add', file]);
+    await exec.exec('git', ['commit', '-m', message]);
+    await exec.exec('git', ['push', 'origin', branch]);
+    await client.pulls.create({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        title: 'New contributors! 💖',
+        body: `
+It looks like there are new contributors in the \`${base}\` branch!
 
-var VMessage = __webpack_require__(270)
-var VFile = __webpack_require__(465)
+I've added the following wonderful people to \`${file}\`:
+* ${newContributors.join('\n* ')}
 
-module.exports = VFile
-
-var proto = VFile.prototype
-
-proto.message = message
-proto.info = info
-proto.fail = fail
-
-// Create a message with `reason` at `position`.
-// When an error is passed in as `reason`, copies the stack.
-function message(reason, position, origin) {
-  var filePath = this.path
-  var message = new VMessage(reason, position, origin)
-
-  if (filePath) {
-    message.name = filePath + ':' + message.name
-    message.file = filePath
-  }
-
-  message.fatal = false
-
-  this.messages.push(message)
-
-  return message
-}
-
-// Fail: creates a vmessage, associates it with the file, and throws it.
-function fail() {
-  var message = this.message.apply(this, arguments)
-
-  message.fatal = true
-
-  throw message
-}
-
-// Info: creates a vmessage, associates it with the file, and marks the fatality
-// as null.
-function info() {
-  var message = this.message.apply(this, arguments)
-
-  message.fatal = null
-
-  return message
-}
+Have a great day!
+Ionitron 💙
+`.trim(),
+        head: branch,
+        base,
+    });
+};
+exports.default = run;
 
 
 /***/ }),
@@ -24803,10 +24977,10 @@ module.exports = mapToArray;
 "use strict";
 
 
-const u = __webpack_require__(303).fromCallback
+const u = __webpack_require__(676).fromCallback
 const path = __webpack_require__(622)
 const fs = __webpack_require__(25)
-const mkdir = __webpack_require__(86)
+const mkdir = __webpack_require__(63)
 
 function createFile (file, callback) {
   function makeFile () {
@@ -24882,7 +25056,7 @@ try {
 } catch (_) {
   _fs = __webpack_require__(747)
 }
-const universalify = __webpack_require__(303)
+const universalify = __webpack_require__(676)
 const { stringify, stripBom } = __webpack_require__(477)
 
 async function _readFile (file, options = {}) {
@@ -25085,29 +25259,20 @@ module.exports = ListCache;
 
 /***/ }),
 /* 671 */
-/***/ (function(module) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
-/**
- * The base implementation of `_.sortBy` which uses `comparer` to define the
- * sort order of `array` and replaces criteria objects with their corresponding
- * values.
- *
- * @private
- * @param {Array} array The array to sort.
- * @param {Function} comparer The function to define sort order.
- * @returns {Array} Returns `array`.
- */
-function baseSortBy(array, comparer) {
-  var length = array.length;
+"use strict";
 
-  array.sort(comparer);
-  while (length--) {
-    array[length] = array[length].value;
-  }
-  return array;
+
+var collapseWhiteSpace = __webpack_require__(724)
+
+module.exports = normalize
+
+// Normalize an identifier.  Collapses multiple white space characters into a
+// single space, and removes casing.
+function normalize(value) {
+  return collapseWhiteSpace(value).toLowerCase()
 }
-
-module.exports = baseSortBy;
 
 
 /***/ }),
@@ -25400,30 +25565,31 @@ module.exports = convert;
 
 /***/ }),
 /* 676 */
-/***/ (function(module) {
+/***/ (function(__unusedmodule, exports) {
 
 "use strict";
 
 
-module.exports = blockquote
+exports.fromCallback = function (fn) {
+  return Object.defineProperty(function (...args) {
+    if (typeof args[args.length - 1] === 'function') fn.apply(this, args)
+    else {
+      return new Promise((resolve, reject) => {
+        fn.apply(
+          this,
+          args.concat([(err, res) => err ? reject(err) : resolve(res)])
+        )
+      })
+    }
+  }, 'name', { value: fn.name })
+}
 
-var lineFeed = '\n'
-var space = ' '
-var greaterThan = '>'
-
-function blockquote(node) {
-  var values = this.block(node).split(lineFeed)
-  var result = []
-  var length = values.length
-  var index = -1
-  var value
-
-  while (++index < length) {
-    value = values[index]
-    result[index] = (value ? space : '') + value
-  }
-
-  return greaterThan + result.join(lineFeed + greaterThan)
+exports.fromPromise = function (fn) {
+  return Object.defineProperty(function (...args) {
+    const cb = args[args.length - 1]
+    if (typeof cb !== 'function') return fn.apply(this, args)
+    else fn.apply(this, args.slice(0, -1)).then(r => cb(null, r), cb)
+  }, 'name', { value: fn.name })
 }
 
 
@@ -27230,7 +27396,53 @@ exports.Deprecation = Deprecation;
 
 /***/ }),
 /* 693 */,
-/* 694 */,
+/* 694 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var isSymbol = __webpack_require__(186);
+
+/**
+ * Compares values to sort them in ascending order.
+ *
+ * @private
+ * @param {*} value The value to compare.
+ * @param {*} other The other value to compare.
+ * @returns {number} Returns the sort order indicator for `value`.
+ */
+function compareAscending(value, other) {
+  if (value !== other) {
+    var valIsDefined = value !== undefined,
+        valIsNull = value === null,
+        valIsReflexive = value === value,
+        valIsSymbol = isSymbol(value);
+
+    var othIsDefined = other !== undefined,
+        othIsNull = other === null,
+        othIsReflexive = other === other,
+        othIsSymbol = isSymbol(other);
+
+    if ((!othIsNull && !othIsSymbol && !valIsSymbol && value > other) ||
+        (valIsSymbol && othIsDefined && othIsReflexive && !othIsNull && !othIsSymbol) ||
+        (valIsNull && othIsDefined && othIsReflexive) ||
+        (!valIsDefined && othIsReflexive) ||
+        !valIsReflexive) {
+      return 1;
+    }
+    if ((!valIsNull && !valIsSymbol && !othIsSymbol && value < other) ||
+        (othIsSymbol && valIsDefined && valIsReflexive && !valIsNull && !valIsSymbol) ||
+        (othIsNull && valIsDefined && valIsReflexive) ||
+        (!othIsDefined && valIsReflexive) ||
+        !othIsReflexive) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+module.exports = compareAscending;
+
+
+/***/ }),
 /* 695 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -27472,27 +27684,7 @@ function escape(eat, value, silent) {
 
 
 /***/ }),
-/* 704 */
-/***/ (function(module) {
-
-"use strict";
-
-
-module.exports = alphabetical
-
-// Check if the given character code, or the character code at the first
-// character, is alphabetical.
-function alphabetical(character) {
-  var code = typeof character === 'string' ? character.charCodeAt(0) : character
-
-  return (
-    (code >= 97 && code <= 122) /* a-z */ ||
-    (code >= 65 && code <= 90) /* A-Z */
-  )
-}
-
-
-/***/ }),
+/* 704 */,
 /* 705 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -27902,179 +28094,7 @@ function toAlignment(value) {
 
 
 /***/ }),
-/* 708 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const fs = __webpack_require__(25)
-const path = __webpack_require__(622)
-const mkdirsSync = __webpack_require__(86).mkdirsSync
-const utimesMillisSync = __webpack_require__(916).utimesMillisSync
-const stat = __webpack_require__(934)
-
-function copySync (src, dest, opts) {
-  if (typeof opts === 'function') {
-    opts = { filter: opts }
-  }
-
-  opts = opts || {}
-  opts.clobber = 'clobber' in opts ? !!opts.clobber : true // default to true for now
-  opts.overwrite = 'overwrite' in opts ? !!opts.overwrite : opts.clobber // overwrite falls back to clobber
-
-  // Warn about using preserveTimestamps on 32-bit node
-  if (opts.preserveTimestamps && process.arch === 'ia32') {
-    console.warn(`fs-extra: Using the preserveTimestamps option in 32-bit node is not recommended;\n
-    see https://github.com/jprichardson/node-fs-extra/issues/269`)
-  }
-
-  const { srcStat, destStat } = stat.checkPathsSync(src, dest, 'copy')
-  stat.checkParentPathsSync(src, srcStat, dest, 'copy')
-  return handleFilterAndCopy(destStat, src, dest, opts)
-}
-
-function handleFilterAndCopy (destStat, src, dest, opts) {
-  if (opts.filter && !opts.filter(src, dest)) return
-  const destParent = path.dirname(dest)
-  if (!fs.existsSync(destParent)) mkdirsSync(destParent)
-  return startCopy(destStat, src, dest, opts)
-}
-
-function startCopy (destStat, src, dest, opts) {
-  if (opts.filter && !opts.filter(src, dest)) return
-  return getStats(destStat, src, dest, opts)
-}
-
-function getStats (destStat, src, dest, opts) {
-  const statSync = opts.dereference ? fs.statSync : fs.lstatSync
-  const srcStat = statSync(src)
-
-  if (srcStat.isDirectory()) return onDir(srcStat, destStat, src, dest, opts)
-  else if (srcStat.isFile() ||
-           srcStat.isCharacterDevice() ||
-           srcStat.isBlockDevice()) return onFile(srcStat, destStat, src, dest, opts)
-  else if (srcStat.isSymbolicLink()) return onLink(destStat, src, dest, opts)
-}
-
-function onFile (srcStat, destStat, src, dest, opts) {
-  if (!destStat) return copyFile(srcStat, src, dest, opts)
-  return mayCopyFile(srcStat, src, dest, opts)
-}
-
-function mayCopyFile (srcStat, src, dest, opts) {
-  if (opts.overwrite) {
-    fs.unlinkSync(dest)
-    return copyFile(srcStat, src, dest, opts)
-  } else if (opts.errorOnExist) {
-    throw new Error(`'${dest}' already exists`)
-  }
-}
-
-function copyFile (srcStat, src, dest, opts) {
-  fs.copyFileSync(src, dest)
-  if (opts.preserveTimestamps) handleTimestamps(srcStat.mode, src, dest)
-  return setDestMode(dest, srcStat.mode)
-}
-
-function handleTimestamps (srcMode, src, dest) {
-  // Make sure the file is writable before setting the timestamp
-  // otherwise open fails with EPERM when invoked with 'r+'
-  // (through utimes call)
-  if (fileIsNotWritable(srcMode)) makeFileWritable(dest, srcMode)
-  return setDestTimestamps(src, dest)
-}
-
-function fileIsNotWritable (srcMode) {
-  return (srcMode & 0o200) === 0
-}
-
-function makeFileWritable (dest, srcMode) {
-  return setDestMode(dest, srcMode | 0o200)
-}
-
-function setDestMode (dest, srcMode) {
-  return fs.chmodSync(dest, srcMode)
-}
-
-function setDestTimestamps (src, dest) {
-  // The initial srcStat.atime cannot be trusted
-  // because it is modified by the read(2) system call
-  // (See https://nodejs.org/api/fs.html#fs_stat_time_values)
-  const updatedSrcStat = fs.statSync(src)
-  return utimesMillisSync(dest, updatedSrcStat.atime, updatedSrcStat.mtime)
-}
-
-function onDir (srcStat, destStat, src, dest, opts) {
-  if (!destStat) return mkDirAndCopy(srcStat.mode, src, dest, opts)
-  if (destStat && !destStat.isDirectory()) {
-    throw new Error(`Cannot overwrite non-directory '${dest}' with directory '${src}'.`)
-  }
-  return copyDir(src, dest, opts)
-}
-
-function mkDirAndCopy (srcMode, src, dest, opts) {
-  fs.mkdirSync(dest)
-  copyDir(src, dest, opts)
-  return setDestMode(dest, srcMode)
-}
-
-function copyDir (src, dest, opts) {
-  fs.readdirSync(src).forEach(item => copyDirItem(item, src, dest, opts))
-}
-
-function copyDirItem (item, src, dest, opts) {
-  const srcItem = path.join(src, item)
-  const destItem = path.join(dest, item)
-  const { destStat } = stat.checkPathsSync(srcItem, destItem, 'copy')
-  return startCopy(destStat, srcItem, destItem, opts)
-}
-
-function onLink (destStat, src, dest, opts) {
-  let resolvedSrc = fs.readlinkSync(src)
-  if (opts.dereference) {
-    resolvedSrc = path.resolve(process.cwd(), resolvedSrc)
-  }
-
-  if (!destStat) {
-    return fs.symlinkSync(resolvedSrc, dest)
-  } else {
-    let resolvedDest
-    try {
-      resolvedDest = fs.readlinkSync(dest)
-    } catch (err) {
-      // dest exists and is a regular file or directory,
-      // Windows may throw UNKNOWN error. If dest already exists,
-      // fs throws error anyway, so no need to guard against it here.
-      if (err.code === 'EINVAL' || err.code === 'UNKNOWN') return fs.symlinkSync(resolvedSrc, dest)
-      throw err
-    }
-    if (opts.dereference) {
-      resolvedDest = path.resolve(process.cwd(), resolvedDest)
-    }
-    if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
-      throw new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`)
-    }
-
-    // prevent copy if src is a subdir of dest since unlinking
-    // dest in this case would result in removing src contents
-    // and therefore a broken symlink would be created.
-    if (fs.statSync(dest).isDirectory() && stat.isSrcSubdir(resolvedDest, resolvedSrc)) {
-      throw new Error(`Cannot overwrite '${resolvedDest}' with '${resolvedSrc}'.`)
-    }
-    return copyLink(resolvedSrc, dest)
-  }
-}
-
-function copyLink (resolvedSrc, dest) {
-  fs.unlinkSync(dest)
-  return fs.symlinkSync(resolvedSrc, dest)
-}
-
-module.exports = copySync
-
-
-/***/ }),
+/* 708 */,
 /* 709 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -28276,159 +28296,79 @@ module.exports = isSet;
 /* 714 */,
 /* 715 */,
 /* 716 */
-/***/ (function(module) {
-
-"use strict";
-
-
-module.exports = locate
-
-var values = ['www.', 'http://', 'https://']
-
-function locate(value, fromIndex) {
-  var min = -1
-  var index
-  var length
-  var position
-
-  if (!this.options.gfm) {
-    return min
-  }
-
-  length = values.length
-  index = -1
-
-  while (++index < length) {
-    position = value.indexOf(values[index], fromIndex)
-
-    if (position !== -1 && (min === -1 || position < min)) {
-      min = position
-    }
-  }
-
-  return min
-}
-
-
-/***/ }),
-/* 717 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
+var escape = __webpack_require__(682),
+    reEscape = __webpack_require__(287),
+    reEvaluate = __webpack_require__(831),
+    reInterpolate = __webpack_require__(699);
 
+/**
+ * By default, the template delimiters used by lodash are like those in
+ * embedded Ruby (ERB) as well as ES2015 template strings. Change the
+ * following template settings to use alternative delimiters.
+ *
+ * @static
+ * @memberOf _
+ * @type {Object}
+ */
+var templateSettings = {
 
-var openCloseTag = __webpack_require__(234).openCloseTag
+  /**
+   * Used to detect `data` property values to be HTML-escaped.
+   *
+   * @memberOf _.templateSettings
+   * @type {RegExp}
+   */
+  'escape': reEscape,
 
-module.exports = blockHtml
+  /**
+   * Used to detect code to be evaluated.
+   *
+   * @memberOf _.templateSettings
+   * @type {RegExp}
+   */
+  'evaluate': reEvaluate,
 
-var tab = '\t'
-var space = ' '
-var lineFeed = '\n'
-var lessThan = '<'
+  /**
+   * Used to detect `data` property values to inject.
+   *
+   * @memberOf _.templateSettings
+   * @type {RegExp}
+   */
+  'interpolate': reInterpolate,
 
-var rawOpenExpression = /^<(script|pre|style)(?=(\s|>|$))/i
-var rawCloseExpression = /<\/(script|pre|style)>/i
-var commentOpenExpression = /^<!--/
-var commentCloseExpression = /-->/
-var instructionOpenExpression = /^<\?/
-var instructionCloseExpression = /\?>/
-var directiveOpenExpression = /^<![A-Za-z]/
-var directiveCloseExpression = />/
-var cdataOpenExpression = /^<!\[CDATA\[/
-var cdataCloseExpression = /]]>/
-var elementCloseExpression = /^$/
-var otherElementOpenExpression = new RegExp(openCloseTag.source + '\\s*$')
+  /**
+   * Used to reference the data object in the template text.
+   *
+   * @memberOf _.templateSettings
+   * @type {string}
+   */
+  'variable': '',
 
-function blockHtml(eat, value, silent) {
-  var self = this
-  var blocks = self.options.blocks.join('|')
-  var elementOpenExpression = new RegExp(
-    '^</?(' + blocks + ')(?=(\\s|/?>|$))',
-    'i'
-  )
-  var length = value.length
-  var index = 0
-  var next
-  var line
-  var offset
-  var character
-  var count
-  var sequence
-  var subvalue
+  /**
+   * Used to import variables into the compiled template.
+   *
+   * @memberOf _.templateSettings
+   * @type {Object}
+   */
+  'imports': {
 
-  var sequences = [
-    [rawOpenExpression, rawCloseExpression, true],
-    [commentOpenExpression, commentCloseExpression, true],
-    [instructionOpenExpression, instructionCloseExpression, true],
-    [directiveOpenExpression, directiveCloseExpression, true],
-    [cdataOpenExpression, cdataCloseExpression, true],
-    [elementOpenExpression, elementCloseExpression, true],
-    [otherElementOpenExpression, elementCloseExpression, false]
-  ]
-
-  // Eat initial spacing.
-  while (index < length) {
-    character = value.charAt(index)
-
-    if (character !== tab && character !== space) {
-      break
-    }
-
-    index++
+    /**
+     * A reference to the `lodash` function.
+     *
+     * @memberOf _.templateSettings.imports
+     * @type {Function}
+     */
+    '_': { 'escape': escape }
   }
+};
 
-  if (value.charAt(index) !== lessThan) {
-    return
-  }
-
-  next = value.indexOf(lineFeed, index + 1)
-  next = next === -1 ? length : next
-  line = value.slice(index, next)
-  offset = -1
-  count = sequences.length
-
-  while (++offset < count) {
-    if (sequences[offset][0].test(line)) {
-      sequence = sequences[offset]
-      break
-    }
-  }
-
-  if (!sequence) {
-    return
-  }
-
-  if (silent) {
-    return sequence[2]
-  }
-
-  index = next
-
-  if (!sequence[1].test(line)) {
-    while (index < length) {
-      next = value.indexOf(lineFeed, index + 1)
-      next = next === -1 ? length : next
-      line = value.slice(index + 1, next)
-
-      if (sequence[1].test(line)) {
-        if (line) {
-          index = next
-        }
-
-        break
-      }
-
-      index = next
-    }
-  }
-
-  subvalue = value.slice(0, index)
-
-  return eat(subvalue)({type: 'html', value: subvalue})
-}
+module.exports = templateSettings;
 
 
 /***/ }),
+/* 717 */,
 /* 718 */,
 /* 719 */,
 /* 720 */,
@@ -28583,25 +28523,35 @@ module.exports = baseMatchesProperty;
 /* 730 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
+var eq = __webpack_require__(338);
 
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
 
-var path = __webpack_require__(622);
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
 
-function replaceExt(npath, ext) {
-  if (typeof npath !== 'string') {
-    return npath;
+/**
+ * Used by `_.defaults` to customize its `_.assignIn` use to assign properties
+ * of source objects to the destination object for all destination properties
+ * that resolve to `undefined`.
+ *
+ * @private
+ * @param {*} objValue The destination value.
+ * @param {*} srcValue The source value.
+ * @param {string} key The key of the property to assign.
+ * @param {Object} object The parent object of `objValue`.
+ * @returns {*} Returns the value to assign.
+ */
+function customDefaultsAssignIn(objValue, srcValue, key, object) {
+  if (objValue === undefined ||
+      (eq(objValue, objectProto[key]) && !hasOwnProperty.call(object, key))) {
+    return srcValue;
   }
-
-  if (npath.length === 0) {
-    return npath;
-  }
-
-  var nFileName = path.basename(npath, path.extname(npath)) + ext;
-  return path.join(path.dirname(npath), nFileName);
+  return objValue;
 }
 
-module.exports = replaceExt;
+module.exports = customDefaultsAssignIn;
 
 
 /***/ }),
@@ -29591,7 +29541,7 @@ function removeHook (state, name, method) {
 "use strict";
 
 
-var label = __webpack_require__(466)
+var label = __webpack_require__(113)
 
 module.exports = imageReference
 
@@ -31335,11 +31285,13 @@ module.exports = nativeKeys;
 /* 774 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var convert = __webpack_require__(675),
-    func = convert('sortBy', __webpack_require__(569));
+"use strict";
 
-func.placeholder = __webpack_require__(602);
-module.exports = func;
+
+const u = __webpack_require__(676).fromCallback
+module.exports = {
+  copy: u(__webpack_require__(500))
+}
 
 
 /***/ }),
@@ -31447,7 +31399,7 @@ module.exports = baseCreate;
 
 var decode = __webpack_require__(277)
 var decimal = __webpack_require__(926)
-var alphabetical = __webpack_require__(704)
+var alphabetical = __webpack_require__(341)
 var locate = __webpack_require__(64)
 
 module.exports = email
@@ -31809,31 +31761,43 @@ module.exports = require("stream");
 /* 795 */
 /***/ (function(module) {
 
-/**
- * Creates a base function for methods like `_.forIn` and `_.forOwn`.
- *
- * @private
- * @param {boolean} [fromRight] Specify iterating from right to left.
- * @returns {Function} Returns the new base function.
- */
-function createBaseFor(fromRight) {
-  return function(object, iteratee, keysFunc) {
-    var index = -1,
-        iterable = Object(object),
-        props = keysFunc(object),
-        length = props.length;
+"use strict";
 
-    while (length--) {
-      var key = props[fromRight ? length : ++index];
-      if (iteratee(iterable[key], key, iterable) === false) {
-        break;
+
+module.exports = factory
+
+var backslash = '\\'
+
+// Factory to de-escape a value, based on a list at `key` in `ctx`.
+function factory(ctx, key) {
+  return unescape
+
+  // De-escape a string using the expression at `key` in `ctx`.
+  function unescape(value) {
+    var previous = 0
+    var index = value.indexOf(backslash)
+    var escape = ctx[key]
+    var queue = []
+    var character
+
+    while (index !== -1) {
+      queue.push(value.slice(previous, index))
+      previous = index + 1
+      character = value.charAt(previous)
+
+      // If the following character is not a valid escape, add the slash.
+      if (!character || escape.indexOf(character) === -1) {
+        queue.push(backslash)
       }
-    }
-    return object;
-  };
-}
 
-module.exports = createBaseFor;
+      index = value.indexOf(backslash, previous + 1)
+    }
+
+    queue.push(value.slice(previous))
+
+    return queue.join('')
+  }
+}
 
 
 /***/ }),
@@ -31869,30 +31833,43 @@ exports.getUserAgent = getUserAgent;
 /* 797 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
+var baseRest = __webpack_require__(272),
+    isIterateeCall = __webpack_require__(663);
 
+/**
+ * Creates a function like `_.assign`.
+ *
+ * @private
+ * @param {Function} assigner The function to assign values.
+ * @returns {Function} Returns the new assigner function.
+ */
+function createAssigner(assigner) {
+  return baseRest(function(object, sources) {
+    var index = -1,
+        length = sources.length,
+        customizer = length > 1 ? sources[length - 1] : undefined,
+        guard = length > 2 ? sources[2] : undefined;
 
-var decode = __webpack_require__(277)
+    customizer = (assigner.length > 3 && typeof customizer == 'function')
+      ? (length--, customizer)
+      : undefined;
 
-module.exports = length
-
-var ampersand = '&'
-
-// Returns the length of HTML entity that is a prefix of the given string
-// (excluding the ampersand), 0 if it does not start with an entity.
-function length(value) {
-  var prefix
-
-  /* istanbul ignore if - Currently also tested for at implemention, but we
-   * keep it here because that’s proper. */
-  if (value.charAt(0) !== ampersand) {
-    return 0
-  }
-
-  prefix = value.split(ampersand, 2).join(ampersand)
-
-  return prefix.length - decode(prefix).length
+    if (guard && isIterateeCall(sources[0], sources[1], guard)) {
+      customizer = length < 3 ? undefined : customizer;
+      length = 1;
+    }
+    object = Object(object);
+    while (++index < length) {
+      var source = sources[index];
+      if (source) {
+        assigner(object, source, index, customizer);
+      }
+    }
+    return object;
+  });
 }
+
+module.exports = createAssigner;
 
 
 /***/ }),
@@ -32062,20 +32039,118 @@ function setextHeading(eat, value, silent) {
 /* 804 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseForOwn = __webpack_require__(341),
-    createBaseEach = __webpack_require__(919);
+"use strict";
 
-/**
- * The base implementation of `_.forEach` without support for iteratee shorthands.
- *
- * @private
- * @param {Array|Object} collection The collection to iterate over.
- * @param {Function} iteratee The function invoked per iteration.
- * @returns {Array|Object} Returns `collection`.
- */
-var baseEach = createBaseEach(baseForOwn);
 
-module.exports = baseEach;
+var openCloseTag = __webpack_require__(234).openCloseTag
+
+module.exports = blockHtml
+
+var tab = '\t'
+var space = ' '
+var lineFeed = '\n'
+var lessThan = '<'
+
+var rawOpenExpression = /^<(script|pre|style)(?=(\s|>|$))/i
+var rawCloseExpression = /<\/(script|pre|style)>/i
+var commentOpenExpression = /^<!--/
+var commentCloseExpression = /-->/
+var instructionOpenExpression = /^<\?/
+var instructionCloseExpression = /\?>/
+var directiveOpenExpression = /^<![A-Za-z]/
+var directiveCloseExpression = />/
+var cdataOpenExpression = /^<!\[CDATA\[/
+var cdataCloseExpression = /]]>/
+var elementCloseExpression = /^$/
+var otherElementOpenExpression = new RegExp(openCloseTag.source + '\\s*$')
+
+function blockHtml(eat, value, silent) {
+  var self = this
+  var blocks = self.options.blocks.join('|')
+  var elementOpenExpression = new RegExp(
+    '^</?(' + blocks + ')(?=(\\s|/?>|$))',
+    'i'
+  )
+  var length = value.length
+  var index = 0
+  var next
+  var line
+  var offset
+  var character
+  var count
+  var sequence
+  var subvalue
+
+  var sequences = [
+    [rawOpenExpression, rawCloseExpression, true],
+    [commentOpenExpression, commentCloseExpression, true],
+    [instructionOpenExpression, instructionCloseExpression, true],
+    [directiveOpenExpression, directiveCloseExpression, true],
+    [cdataOpenExpression, cdataCloseExpression, true],
+    [elementOpenExpression, elementCloseExpression, true],
+    [otherElementOpenExpression, elementCloseExpression, false]
+  ]
+
+  // Eat initial spacing.
+  while (index < length) {
+    character = value.charAt(index)
+
+    if (character !== tab && character !== space) {
+      break
+    }
+
+    index++
+  }
+
+  if (value.charAt(index) !== lessThan) {
+    return
+  }
+
+  next = value.indexOf(lineFeed, index + 1)
+  next = next === -1 ? length : next
+  line = value.slice(index, next)
+  offset = -1
+  count = sequences.length
+
+  while (++offset < count) {
+    if (sequences[offset][0].test(line)) {
+      sequence = sequences[offset]
+      break
+    }
+  }
+
+  if (!sequence) {
+    return
+  }
+
+  if (silent) {
+    return sequence[2]
+  }
+
+  index = next
+
+  if (!sequence[1].test(line)) {
+    while (index < length) {
+      next = value.indexOf(lineFeed, index + 1)
+      next = next === -1 ? length : next
+      line = value.slice(index + 1, next)
+
+      if (sequence[1].test(line)) {
+        if (line) {
+          index = next
+        }
+
+        break
+      }
+
+      index = next
+    }
+  }
+
+  subvalue = value.slice(0, index)
+
+  return eat(subvalue)({type: 'html', value: subvalue})
+}
 
 
 /***/ }),
@@ -32105,79 +32180,7 @@ module.exports = new Schema({
 
 /***/ }),
 /* 806 */,
-/* 807 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var SetCache = __webpack_require__(405),
-    arrayIncludes = __webpack_require__(887),
-    arrayIncludesWith = __webpack_require__(655),
-    arrayMap = __webpack_require__(727),
-    baseUnary = __webpack_require__(231),
-    cacheHas = __webpack_require__(275);
-
-/** Used as the size to enable large array optimizations. */
-var LARGE_ARRAY_SIZE = 200;
-
-/**
- * The base implementation of methods like `_.difference` without support
- * for excluding multiple arrays or iteratee shorthands.
- *
- * @private
- * @param {Array} array The array to inspect.
- * @param {Array} values The values to exclude.
- * @param {Function} [iteratee] The iteratee invoked per element.
- * @param {Function} [comparator] The comparator invoked per element.
- * @returns {Array} Returns the new array of filtered values.
- */
-function baseDifference(array, values, iteratee, comparator) {
-  var index = -1,
-      includes = arrayIncludes,
-      isCommon = true,
-      length = array.length,
-      result = [],
-      valuesLength = values.length;
-
-  if (!length) {
-    return result;
-  }
-  if (iteratee) {
-    values = arrayMap(values, baseUnary(iteratee));
-  }
-  if (comparator) {
-    includes = arrayIncludesWith;
-    isCommon = false;
-  }
-  else if (values.length >= LARGE_ARRAY_SIZE) {
-    includes = cacheHas;
-    isCommon = false;
-    values = new SetCache(values);
-  }
-  outer:
-  while (++index < length) {
-    var value = array[index],
-        computed = iteratee == null ? value : iteratee(value);
-
-    value = (comparator || value !== 0) ? value : 0;
-    if (isCommon && computed === computed) {
-      var valuesIndex = valuesLength;
-      while (valuesIndex--) {
-        if (values[valuesIndex] === computed) {
-          continue outer;
-        }
-      }
-      result.push(value);
-    }
-    else if (!includes(values, computed, comparator)) {
-      result.push(value);
-    }
-  }
-  return result;
-}
-
-module.exports = baseDifference;
-
-
-/***/ }),
+/* 807 */,
 /* 808 */,
 /* 809 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -32628,247 +32631,19 @@ module.exports = root;
 
 /***/ }),
 /* 825 */,
-/* 826 */
+/* 826 */,
+/* 827 */,
+/* 828 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-"use strict";
+var convert = __webpack_require__(675),
+    func = convert('sortBy', __webpack_require__(569));
 
-
-const fs = __webpack_require__(25)
-const path = __webpack_require__(622)
-const mkdirs = __webpack_require__(86).mkdirs
-const pathExists = __webpack_require__(397).pathExists
-const utimesMillis = __webpack_require__(916).utimesMillis
-const stat = __webpack_require__(934)
-
-function copy (src, dest, opts, cb) {
-  if (typeof opts === 'function' && !cb) {
-    cb = opts
-    opts = {}
-  } else if (typeof opts === 'function') {
-    opts = { filter: opts }
-  }
-
-  cb = cb || function () {}
-  opts = opts || {}
-
-  opts.clobber = 'clobber' in opts ? !!opts.clobber : true // default to true for now
-  opts.overwrite = 'overwrite' in opts ? !!opts.overwrite : opts.clobber // overwrite falls back to clobber
-
-  // Warn about using preserveTimestamps on 32-bit node
-  if (opts.preserveTimestamps && process.arch === 'ia32') {
-    console.warn(`fs-extra: Using the preserveTimestamps option in 32-bit node is not recommended;\n
-    see https://github.com/jprichardson/node-fs-extra/issues/269`)
-  }
-
-  stat.checkPaths(src, dest, 'copy', (err, stats) => {
-    if (err) return cb(err)
-    const { srcStat, destStat } = stats
-    stat.checkParentPaths(src, srcStat, dest, 'copy', err => {
-      if (err) return cb(err)
-      if (opts.filter) return handleFilter(checkParentDir, destStat, src, dest, opts, cb)
-      return checkParentDir(destStat, src, dest, opts, cb)
-    })
-  })
-}
-
-function checkParentDir (destStat, src, dest, opts, cb) {
-  const destParent = path.dirname(dest)
-  pathExists(destParent, (err, dirExists) => {
-    if (err) return cb(err)
-    if (dirExists) return startCopy(destStat, src, dest, opts, cb)
-    mkdirs(destParent, err => {
-      if (err) return cb(err)
-      return startCopy(destStat, src, dest, opts, cb)
-    })
-  })
-}
-
-function handleFilter (onInclude, destStat, src, dest, opts, cb) {
-  Promise.resolve(opts.filter(src, dest)).then(include => {
-    if (include) return onInclude(destStat, src, dest, opts, cb)
-    return cb()
-  }, error => cb(error))
-}
-
-function startCopy (destStat, src, dest, opts, cb) {
-  if (opts.filter) return handleFilter(getStats, destStat, src, dest, opts, cb)
-  return getStats(destStat, src, dest, opts, cb)
-}
-
-function getStats (destStat, src, dest, opts, cb) {
-  const stat = opts.dereference ? fs.stat : fs.lstat
-  stat(src, (err, srcStat) => {
-    if (err) return cb(err)
-
-    if (srcStat.isDirectory()) return onDir(srcStat, destStat, src, dest, opts, cb)
-    else if (srcStat.isFile() ||
-             srcStat.isCharacterDevice() ||
-             srcStat.isBlockDevice()) return onFile(srcStat, destStat, src, dest, opts, cb)
-    else if (srcStat.isSymbolicLink()) return onLink(destStat, src, dest, opts, cb)
-  })
-}
-
-function onFile (srcStat, destStat, src, dest, opts, cb) {
-  if (!destStat) return copyFile(srcStat, src, dest, opts, cb)
-  return mayCopyFile(srcStat, src, dest, opts, cb)
-}
-
-function mayCopyFile (srcStat, src, dest, opts, cb) {
-  if (opts.overwrite) {
-    fs.unlink(dest, err => {
-      if (err) return cb(err)
-      return copyFile(srcStat, src, dest, opts, cb)
-    })
-  } else if (opts.errorOnExist) {
-    return cb(new Error(`'${dest}' already exists`))
-  } else return cb()
-}
-
-function copyFile (srcStat, src, dest, opts, cb) {
-  fs.copyFile(src, dest, err => {
-    if (err) return cb(err)
-    if (opts.preserveTimestamps) return handleTimestampsAndMode(srcStat.mode, src, dest, cb)
-    return setDestMode(dest, srcStat.mode, cb)
-  })
-}
-
-function handleTimestampsAndMode (srcMode, src, dest, cb) {
-  // Make sure the file is writable before setting the timestamp
-  // otherwise open fails with EPERM when invoked with 'r+'
-  // (through utimes call)
-  if (fileIsNotWritable(srcMode)) {
-    return makeFileWritable(dest, srcMode, err => {
-      if (err) return cb(err)
-      return setDestTimestampsAndMode(srcMode, src, dest, cb)
-    })
-  }
-  return setDestTimestampsAndMode(srcMode, src, dest, cb)
-}
-
-function fileIsNotWritable (srcMode) {
-  return (srcMode & 0o200) === 0
-}
-
-function makeFileWritable (dest, srcMode, cb) {
-  return setDestMode(dest, srcMode | 0o200, cb)
-}
-
-function setDestTimestampsAndMode (srcMode, src, dest, cb) {
-  setDestTimestamps(src, dest, err => {
-    if (err) return cb(err)
-    return setDestMode(dest, srcMode, cb)
-  })
-}
-
-function setDestMode (dest, srcMode, cb) {
-  return fs.chmod(dest, srcMode, cb)
-}
-
-function setDestTimestamps (src, dest, cb) {
-  // The initial srcStat.atime cannot be trusted
-  // because it is modified by the read(2) system call
-  // (See https://nodejs.org/api/fs.html#fs_stat_time_values)
-  fs.stat(src, (err, updatedSrcStat) => {
-    if (err) return cb(err)
-    return utimesMillis(dest, updatedSrcStat.atime, updatedSrcStat.mtime, cb)
-  })
-}
-
-function onDir (srcStat, destStat, src, dest, opts, cb) {
-  if (!destStat) return mkDirAndCopy(srcStat.mode, src, dest, opts, cb)
-  if (destStat && !destStat.isDirectory()) {
-    return cb(new Error(`Cannot overwrite non-directory '${dest}' with directory '${src}'.`))
-  }
-  return copyDir(src, dest, opts, cb)
-}
-
-function mkDirAndCopy (srcMode, src, dest, opts, cb) {
-  fs.mkdir(dest, err => {
-    if (err) return cb(err)
-    copyDir(src, dest, opts, err => {
-      if (err) return cb(err)
-      return setDestMode(dest, srcMode, cb)
-    })
-  })
-}
-
-function copyDir (src, dest, opts, cb) {
-  fs.readdir(src, (err, items) => {
-    if (err) return cb(err)
-    return copyDirItems(items, src, dest, opts, cb)
-  })
-}
-
-function copyDirItems (items, src, dest, opts, cb) {
-  const item = items.pop()
-  if (!item) return cb()
-  return copyDirItem(items, item, src, dest, opts, cb)
-}
-
-function copyDirItem (items, item, src, dest, opts, cb) {
-  const srcItem = path.join(src, item)
-  const destItem = path.join(dest, item)
-  stat.checkPaths(srcItem, destItem, 'copy', (err, stats) => {
-    if (err) return cb(err)
-    const { destStat } = stats
-    startCopy(destStat, srcItem, destItem, opts, err => {
-      if (err) return cb(err)
-      return copyDirItems(items, src, dest, opts, cb)
-    })
-  })
-}
-
-function onLink (destStat, src, dest, opts, cb) {
-  fs.readlink(src, (err, resolvedSrc) => {
-    if (err) return cb(err)
-    if (opts.dereference) {
-      resolvedSrc = path.resolve(process.cwd(), resolvedSrc)
-    }
-
-    if (!destStat) {
-      return fs.symlink(resolvedSrc, dest, cb)
-    } else {
-      fs.readlink(dest, (err, resolvedDest) => {
-        if (err) {
-          // dest exists and is a regular file or directory,
-          // Windows may throw UNKNOWN error. If dest already exists,
-          // fs throws error anyway, so no need to guard against it here.
-          if (err.code === 'EINVAL' || err.code === 'UNKNOWN') return fs.symlink(resolvedSrc, dest, cb)
-          return cb(err)
-        }
-        if (opts.dereference) {
-          resolvedDest = path.resolve(process.cwd(), resolvedDest)
-        }
-        if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
-          return cb(new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`))
-        }
-
-        // do not copy if src is a subdir of dest since unlinking
-        // dest in this case would result in removing src contents
-        // and therefore a broken symlink would be created.
-        if (destStat.isDirectory() && stat.isSrcSubdir(resolvedDest, resolvedSrc)) {
-          return cb(new Error(`Cannot overwrite '${resolvedDest}' with '${resolvedSrc}'.`))
-        }
-        return copyLink(resolvedSrc, dest, cb)
-      })
-    }
-  })
-}
-
-function copyLink (resolvedSrc, dest, cb) {
-  fs.unlink(dest, err => {
-    if (err) return cb(err)
-    return fs.symlink(resolvedSrc, dest, cb)
-  })
-}
-
-module.exports = copy
+func.placeholder = __webpack_require__(602);
+module.exports = func;
 
 
 /***/ }),
-/* 827 */,
-/* 828 */,
 /* 829 */
 /***/ (function(module) {
 
@@ -32886,80 +32661,105 @@ function locate(value, fromIndex) {
 /* 830 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var SetCache = __webpack_require__(405),
-    arrayIncludes = __webpack_require__(887),
-    arrayIncludesWith = __webpack_require__(655),
-    arrayMap = __webpack_require__(727),
-    baseUnary = __webpack_require__(231),
-    cacheHas = __webpack_require__(275);
+"use strict";
 
-/* Built-in method references for those with the same name as other `lodash` methods. */
-var nativeMin = Math.min;
 
-/**
- * The base implementation of methods like `_.intersection`, without support
- * for iteratee shorthands, that accepts an array of arrays to inspect.
- *
- * @private
- * @param {Array} arrays The arrays to inspect.
- * @param {Function} [iteratee] The iteratee invoked per element.
- * @param {Function} [comparator] The comparator invoked per element.
- * @returns {Array} Returns the new array of shared values.
- */
-function baseIntersection(arrays, iteratee, comparator) {
-  var includes = comparator ? arrayIncludesWith : arrayIncludes,
-      length = arrays[0].length,
-      othLength = arrays.length,
-      othIndex = othLength,
-      caches = Array(othLength),
-      maxLength = Infinity,
-      result = [];
+var repeat = __webpack_require__(8)
+var trim = __webpack_require__(932)
 
-  while (othIndex--) {
-    var array = arrays[othIndex];
-    if (othIndex && iteratee) {
-      array = arrayMap(array, baseUnary(iteratee));
-    }
-    maxLength = nativeMin(array.length, maxLength);
-    caches[othIndex] = !comparator && (iteratee || (length >= 120 && array.length >= 120))
-      ? new SetCache(othIndex && array)
-      : undefined;
-  }
-  array = arrays[0];
+module.exports = indentedCode
 
-  var index = -1,
-      seen = caches[0];
+var lineFeed = '\n'
+var tab = '\t'
+var space = ' '
 
-  outer:
-  while (++index < length && result.length < maxLength) {
-    var value = array[index],
-        computed = iteratee ? iteratee(value) : value;
+var tabSize = 4
+var codeIndent = repeat(space, tabSize)
 
-    value = (comparator || value !== 0) ? value : 0;
-    if (!(seen
-          ? cacheHas(seen, computed)
-          : includes(result, computed, comparator)
-        )) {
-      othIndex = othLength;
-      while (--othIndex) {
-        var cache = caches[othIndex];
-        if (!(cache
-              ? cacheHas(cache, computed)
-              : includes(arrays[othIndex], computed, comparator))
-            ) {
-          continue outer;
+function indentedCode(eat, value, silent) {
+  var index = -1
+  var length = value.length
+  var subvalue = ''
+  var content = ''
+  var subvalueQueue = ''
+  var contentQueue = ''
+  var character
+  var blankQueue
+  var indent
+
+  while (++index < length) {
+    character = value.charAt(index)
+
+    if (indent) {
+      indent = false
+
+      subvalue += subvalueQueue
+      content += contentQueue
+      subvalueQueue = ''
+      contentQueue = ''
+
+      if (character === lineFeed) {
+        subvalueQueue = character
+        contentQueue = character
+      } else {
+        subvalue += character
+        content += character
+
+        while (++index < length) {
+          character = value.charAt(index)
+
+          if (!character || character === lineFeed) {
+            contentQueue = character
+            subvalueQueue = character
+            break
+          }
+
+          subvalue += character
+          content += character
         }
       }
-      if (seen) {
-        seen.push(computed);
+    } else if (
+      character === space &&
+      value.charAt(index + 1) === character &&
+      value.charAt(index + 2) === character &&
+      value.charAt(index + 3) === character
+    ) {
+      subvalueQueue += codeIndent
+      index += 3
+      indent = true
+    } else if (character === tab) {
+      subvalueQueue += character
+      indent = true
+    } else {
+      blankQueue = ''
+
+      while (character === tab || character === space) {
+        blankQueue += character
+        character = value.charAt(++index)
       }
-      result.push(value);
+
+      if (character !== lineFeed) {
+        break
+      }
+
+      subvalueQueue += blankQueue + character
+      contentQueue += character
     }
   }
-  return result;
-}
 
-module.exports = baseIntersection;
+  if (content) {
+    if (silent) {
+      return true
+    }
+
+    return eat(subvalue)({
+      type: 'code',
+      lang: null,
+      meta: null,
+      value: trim(content)
+    })
+  }
+}
 
 
 /***/ }),
@@ -32975,154 +32775,7 @@ module.exports = reEvaluate;
 /***/ }),
 /* 832 */,
 /* 833 */,
-/* 834 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-// Adapted from https://github.com/sindresorhus/make-dir
-// Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-const fs = __webpack_require__(587)
-const path = __webpack_require__(622)
-const atLeastNode = __webpack_require__(213)
-
-const useNativeRecursiveOption = atLeastNode('10.12.0')
-
-// https://github.com/nodejs/node/issues/8987
-// https://github.com/libuv/libuv/pull/1088
-const checkPath = pth => {
-  if (process.platform === 'win32') {
-    const pathHasInvalidWinCharacters = /[<>:"|?*]/.test(pth.replace(path.parse(pth).root, ''))
-
-    if (pathHasInvalidWinCharacters) {
-      const error = new Error(`Path contains invalid characters: ${pth}`)
-      error.code = 'EINVAL'
-      throw error
-    }
-  }
-}
-
-const processOptions = options => {
-  const defaults = { mode: 0o777 }
-  if (typeof options === 'number') options = { mode: options }
-  return { ...defaults, ...options }
-}
-
-const permissionError = pth => {
-  // This replicates the exception of `fs.mkdir` with native the
-  // `recusive` option when run on an invalid drive under Windows.
-  const error = new Error(`operation not permitted, mkdir '${pth}'`)
-  error.code = 'EPERM'
-  error.errno = -4048
-  error.path = pth
-  error.syscall = 'mkdir'
-  return error
-}
-
-module.exports.makeDir = async (input, options) => {
-  checkPath(input)
-  options = processOptions(options)
-
-  if (useNativeRecursiveOption) {
-    const pth = path.resolve(input)
-
-    return fs.mkdir(pth, {
-      mode: options.mode,
-      recursive: true
-    })
-  }
-
-  const make = async pth => {
-    try {
-      await fs.mkdir(pth, options.mode)
-    } catch (error) {
-      if (error.code === 'EPERM') {
-        throw error
-      }
-
-      if (error.code === 'ENOENT') {
-        if (path.dirname(pth) === pth) {
-          throw permissionError(pth)
-        }
-
-        if (error.message.includes('null bytes')) {
-          throw error
-        }
-
-        await make(path.dirname(pth))
-        return make(pth)
-      }
-
-      try {
-        const stats = await fs.stat(pth)
-        if (!stats.isDirectory()) {
-          // This error is never exposed to the user
-          // it is caught below, and the original error is thrown
-          throw new Error('The path is not a directory')
-        }
-      } catch {
-        throw error
-      }
-    }
-  }
-
-  return make(path.resolve(input))
-}
-
-module.exports.makeDirSync = (input, options) => {
-  checkPath(input)
-  options = processOptions(options)
-
-  if (useNativeRecursiveOption) {
-    const pth = path.resolve(input)
-
-    return fs.mkdirSync(pth, {
-      mode: options.mode,
-      recursive: true
-    })
-  }
-
-  const make = pth => {
-    try {
-      fs.mkdirSync(pth, options.mode)
-    } catch (error) {
-      if (error.code === 'EPERM') {
-        throw error
-      }
-
-      if (error.code === 'ENOENT') {
-        if (path.dirname(pth) === pth) {
-          throw permissionError(pth)
-        }
-
-        if (error.message.includes('null bytes')) {
-          throw error
-        }
-
-        make(path.dirname(pth))
-        return make(pth)
-      }
-
-      try {
-        if (!fs.statSync(pth).isDirectory()) {
-          // This error is never exposed to the user
-          // it is caught below, and the original error is thrown
-          throw new Error('The path is not a directory')
-        }
-      } catch {
-        throw error
-      }
-    }
-  }
-
-  return make(path.resolve(input))
-}
-
-
-/***/ }),
+/* 834 */,
 /* 835 */
 /***/ (function(module) {
 
@@ -35138,7 +34791,7 @@ exports.restEndpointMethods = restEndpointMethods;
 /* 843 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var createBaseFor = __webpack_require__(795);
+var createBaseFor = __webpack_require__(989);
 
 /**
  * The base implementation of `baseForOwn` which iterates over `object`
@@ -35157,7 +34810,46 @@ module.exports = baseFor;
 
 
 /***/ }),
-/* 844 */,
+/* 844 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var arrayMap = __webpack_require__(727),
+    baseIteratee = __webpack_require__(354),
+    baseMap = __webpack_require__(852),
+    baseSortBy = __webpack_require__(135),
+    baseUnary = __webpack_require__(231),
+    compareMultiple = __webpack_require__(552),
+    identity = __webpack_require__(83);
+
+/**
+ * The base implementation of `_.orderBy` without param guards.
+ *
+ * @private
+ * @param {Array|Object} collection The collection to iterate over.
+ * @param {Function[]|Object[]|string[]} iteratees The iteratees to sort by.
+ * @param {string[]} orders The sort orders of `iteratees`.
+ * @returns {Array} Returns the new sorted array.
+ */
+function baseOrderBy(collection, iteratees, orders) {
+  var index = -1;
+  iteratees = arrayMap(iteratees.length ? iteratees : [identity], baseUnary(baseIteratee));
+
+  var result = baseMap(collection, function(value, key, collection) {
+    var criteria = arrayMap(iteratees, function(iteratee) {
+      return iteratee(value);
+    });
+    return { 'criteria': criteria, 'index': ++index, 'value': value };
+  });
+
+  return baseSortBy(result, function(object, other) {
+    return compareMultiple(object, other, orders);
+  });
+}
+
+module.exports = baseOrderBy;
+
+
+/***/ }),
 /* 845 */,
 /* 846 */,
 /* 847 */,
@@ -35226,101 +34918,66 @@ module.exports = iteratee;
 "use strict";
 
 
-var repeat = __webpack_require__(8)
-var trim = __webpack_require__(932)
+const u = __webpack_require__(676).fromCallback
+const path = __webpack_require__(622)
+const fs = __webpack_require__(25)
+const _mkdirs = __webpack_require__(63)
+const mkdirs = _mkdirs.mkdirs
+const mkdirsSync = _mkdirs.mkdirsSync
 
-module.exports = indentedCode
+const _symlinkPaths = __webpack_require__(97)
+const symlinkPaths = _symlinkPaths.symlinkPaths
+const symlinkPathsSync = _symlinkPaths.symlinkPathsSync
 
-var lineFeed = '\n'
-var tab = '\t'
-var space = ' '
+const _symlinkType = __webpack_require__(975)
+const symlinkType = _symlinkType.symlinkType
+const symlinkTypeSync = _symlinkType.symlinkTypeSync
 
-var tabSize = 4
-var codeIndent = repeat(space, tabSize)
+const pathExists = __webpack_require__(322).pathExists
 
-function indentedCode(eat, value, silent) {
-  var index = -1
-  var length = value.length
-  var subvalue = ''
-  var content = ''
-  var subvalueQueue = ''
-  var contentQueue = ''
-  var character
-  var blankQueue
-  var indent
+function createSymlink (srcpath, dstpath, type, callback) {
+  callback = (typeof type === 'function') ? type : callback
+  type = (typeof type === 'function') ? false : type
 
-  while (++index < length) {
-    character = value.charAt(index)
-
-    if (indent) {
-      indent = false
-
-      subvalue += subvalueQueue
-      content += contentQueue
-      subvalueQueue = ''
-      contentQueue = ''
-
-      if (character === lineFeed) {
-        subvalueQueue = character
-        contentQueue = character
-      } else {
-        subvalue += character
-        content += character
-
-        while (++index < length) {
-          character = value.charAt(index)
-
-          if (!character || character === lineFeed) {
-            contentQueue = character
-            subvalueQueue = character
-            break
-          }
-
-          subvalue += character
-          content += character
-        }
-      }
-    } else if (
-      character === space &&
-      value.charAt(index + 1) === character &&
-      value.charAt(index + 2) === character &&
-      value.charAt(index + 3) === character
-    ) {
-      subvalueQueue += codeIndent
-      index += 3
-      indent = true
-    } else if (character === tab) {
-      subvalueQueue += character
-      indent = true
-    } else {
-      blankQueue = ''
-
-      while (character === tab || character === space) {
-        blankQueue += character
-        character = value.charAt(++index)
-      }
-
-      if (character !== lineFeed) {
-        break
-      }
-
-      subvalueQueue += blankQueue + character
-      contentQueue += character
-    }
-  }
-
-  if (content) {
-    if (silent) {
-      return true
-    }
-
-    return eat(subvalue)({
-      type: 'code',
-      lang: null,
-      meta: null,
-      value: trim(content)
+  pathExists(dstpath, (err, destinationExists) => {
+    if (err) return callback(err)
+    if (destinationExists) return callback(null)
+    symlinkPaths(srcpath, dstpath, (err, relative) => {
+      if (err) return callback(err)
+      srcpath = relative.toDst
+      symlinkType(relative.toCwd, type, (err, type) => {
+        if (err) return callback(err)
+        const dir = path.dirname(dstpath)
+        pathExists(dir, (err, dirExists) => {
+          if (err) return callback(err)
+          if (dirExists) return fs.symlink(srcpath, dstpath, type, callback)
+          mkdirs(dir, err => {
+            if (err) return callback(err)
+            fs.symlink(srcpath, dstpath, type, callback)
+          })
+        })
+      })
     })
-  }
+  })
+}
+
+function createSymlinkSync (srcpath, dstpath, type) {
+  const destinationExists = fs.existsSync(dstpath)
+  if (destinationExists) return undefined
+
+  const relative = symlinkPathsSync(srcpath, dstpath)
+  srcpath = relative.toDst
+  type = symlinkTypeSync(relative.toCwd, type)
+  const dir = path.dirname(dstpath)
+  const exists = fs.existsSync(dir)
+  if (exists) return fs.symlinkSync(srcpath, dstpath, type)
+  mkdirsSync(dir)
+  return fs.symlinkSync(srcpath, dstpath, type)
+}
+
+module.exports = {
+  createSymlink: u(createSymlink),
+  createSymlinkSync
 }
 
 
@@ -35400,7 +35057,7 @@ module.exports = baseKeysIn;
 /* 852 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var baseEach = __webpack_require__(804),
+var baseEach = __webpack_require__(281),
     isArrayLike = __webpack_require__(192);
 
 /**
@@ -35522,79 +35179,7 @@ module.exports = baseGetAllKeys;
 
 /***/ }),
 /* 858 */,
-/* 859 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var escape = __webpack_require__(682),
-    reEscape = __webpack_require__(287),
-    reEvaluate = __webpack_require__(831),
-    reInterpolate = __webpack_require__(699);
-
-/**
- * By default, the template delimiters used by lodash are like those in
- * embedded Ruby (ERB) as well as ES2015 template strings. Change the
- * following template settings to use alternative delimiters.
- *
- * @static
- * @memberOf _
- * @type {Object}
- */
-var templateSettings = {
-
-  /**
-   * Used to detect `data` property values to be HTML-escaped.
-   *
-   * @memberOf _.templateSettings
-   * @type {RegExp}
-   */
-  'escape': reEscape,
-
-  /**
-   * Used to detect code to be evaluated.
-   *
-   * @memberOf _.templateSettings
-   * @type {RegExp}
-   */
-  'evaluate': reEvaluate,
-
-  /**
-   * Used to detect `data` property values to inject.
-   *
-   * @memberOf _.templateSettings
-   * @type {RegExp}
-   */
-  'interpolate': reInterpolate,
-
-  /**
-   * Used to reference the data object in the template text.
-   *
-   * @memberOf _.templateSettings
-   * @type {string}
-   */
-  'variable': '',
-
-  /**
-   * Used to import variables into the compiled template.
-   *
-   * @memberOf _.templateSettings
-   * @type {Object}
-   */
-  'imports': {
-
-    /**
-     * A reference to the `lodash` function.
-     *
-     * @memberOf _.templateSettings.imports
-     * @type {Function}
-     */
-    '_': { 'escape': escape }
-  }
-};
-
-module.exports = templateSettings;
-
-
-/***/ }),
+/* 859 */,
 /* 860 */
 /***/ (function(module, exports) {
 
@@ -35778,38 +35363,76 @@ module.exports = stackGet;
 "use strict";
 
 
-module.exports = visit
+var VMessage = __webpack_require__(270)
+var VFile = __webpack_require__(465)
 
-var visitParents = __webpack_require__(882)
+module.exports = VFile
 
-var CONTINUE = visitParents.CONTINUE
-var SKIP = visitParents.SKIP
-var EXIT = visitParents.EXIT
+var proto = VFile.prototype
 
-visit.CONTINUE = CONTINUE
-visit.SKIP = SKIP
-visit.EXIT = EXIT
+proto.message = message
+proto.info = info
+proto.fail = fail
 
-function visit(tree, test, visitor, reverse) {
-  if (typeof test === 'function' && typeof visitor !== 'function') {
-    reverse = visitor
-    visitor = test
-    test = null
+// Create a message with `reason` at `position`.
+// When an error is passed in as `reason`, copies the stack.
+function message(reason, position, origin) {
+  var filePath = this.path
+  var message = new VMessage(reason, position, origin)
+
+  if (filePath) {
+    message.name = filePath + ':' + message.name
+    message.file = filePath
   }
 
-  visitParents(tree, test, overload, reverse)
+  message.fatal = false
 
-  function overload(node, parents) {
-    var parent = parents[parents.length - 1]
-    var index = parent ? parent.children.indexOf(node) : null
-    return visitor(node, index, parent)
-  }
+  this.messages.push(message)
+
+  return message
+}
+
+// Fail: creates a vmessage, associates it with the file, and throws it.
+function fail() {
+  var message = this.message.apply(this, arguments)
+
+  message.fatal = true
+
+  throw message
+}
+
+// Info: creates a vmessage, associates it with the file, and marks the fatality
+// as null.
+function info() {
+  var message = this.message.apply(this, arguments)
+
+  message.fatal = null
+
+  return message
 }
 
 
 /***/ }),
 /* 873 */,
-/* 874 */,
+/* 874 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var alphabetical = __webpack_require__(341)
+var decimal = __webpack_require__(926)
+
+module.exports = alphanumerical
+
+// Check if the given character code, or the character code at the first
+// character, is alphanumerical.
+function alphanumerical(character) {
+  return alphabetical(character) || decimal(character)
+}
+
+
+/***/ }),
 /* 875 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -36676,11 +36299,11 @@ exports.withCustomRequest = withCustomRequest;
 "use strict";
 
 
-const u = __webpack_require__(303).fromCallback
+const u = __webpack_require__(676).fromCallback
 const path = __webpack_require__(622)
 const fs = __webpack_require__(25)
-const mkdir = __webpack_require__(86)
-const pathExists = __webpack_require__(397).pathExists
+const mkdir = __webpack_require__(63)
+const pathExists = __webpack_require__(322).pathExists
 
 function createLink (srcpath, dstpath, callback) {
   function makeLink (srcpath, dstpath) {
@@ -37128,7 +36751,23 @@ exports.exec = exec;
 //# sourceMappingURL=exec.js.map
 
 /***/ }),
-/* 918 */,
+/* 918 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var compact = __webpack_require__(218)
+
+module.exports = compile
+
+// Stringify the given tree.
+function compile() {
+  return this.visit(compact(this.tree, this.options.commonmark))
+}
+
+
+/***/ }),
 /* 919 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -37167,7 +36806,28 @@ module.exports = createBaseEach;
 
 
 /***/ }),
-/* 920 */,
+/* 920 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseFor = __webpack_require__(843),
+    keys = __webpack_require__(863);
+
+/**
+ * The base implementation of `_.forOwn` without support for iteratee shorthands.
+ *
+ * @private
+ * @param {Object} object The object to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Object} Returns `object`.
+ */
+function baseForOwn(object, iteratee) {
+  return object && baseFor(object, iteratee, keys);
+}
+
+module.exports = baseForOwn;
+
+
+/***/ }),
 /* 921 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -37438,152 +37098,7 @@ module.exports = toFinite;
 
 
 /***/ }),
-/* 934 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const fs = __webpack_require__(587)
-const path = __webpack_require__(622)
-const util = __webpack_require__(669)
-const atLeastNode = __webpack_require__(213)
-
-const nodeSupportsBigInt = atLeastNode('10.5.0')
-const stat = (file) => nodeSupportsBigInt ? fs.stat(file, { bigint: true }) : fs.stat(file)
-const statSync = (file) => nodeSupportsBigInt ? fs.statSync(file, { bigint: true }) : fs.statSync(file)
-
-function getStats (src, dest) {
-  return Promise.all([
-    stat(src),
-    stat(dest).catch(err => {
-      if (err.code === 'ENOENT') return null
-      throw err
-    })
-  ]).then(([srcStat, destStat]) => ({ srcStat, destStat }))
-}
-
-function getStatsSync (src, dest) {
-  let destStat
-  const srcStat = statSync(src)
-  try {
-    destStat = statSync(dest)
-  } catch (err) {
-    if (err.code === 'ENOENT') return { srcStat, destStat: null }
-    throw err
-  }
-  return { srcStat, destStat }
-}
-
-function checkPaths (src, dest, funcName, cb) {
-  util.callbackify(getStats)(src, dest, (err, stats) => {
-    if (err) return cb(err)
-    const { srcStat, destStat } = stats
-    if (destStat && areIdentical(srcStat, destStat)) {
-      return cb(new Error('Source and destination must not be the same.'))
-    }
-    if (srcStat.isDirectory() && isSrcSubdir(src, dest)) {
-      return cb(new Error(errMsg(src, dest, funcName)))
-    }
-    return cb(null, { srcStat, destStat })
-  })
-}
-
-function checkPathsSync (src, dest, funcName) {
-  const { srcStat, destStat } = getStatsSync(src, dest)
-  if (destStat && areIdentical(srcStat, destStat)) {
-    throw new Error('Source and destination must not be the same.')
-  }
-  if (srcStat.isDirectory() && isSrcSubdir(src, dest)) {
-    throw new Error(errMsg(src, dest, funcName))
-  }
-  return { srcStat, destStat }
-}
-
-// recursively check if dest parent is a subdirectory of src.
-// It works for all file types including symlinks since it
-// checks the src and dest inodes. It starts from the deepest
-// parent and stops once it reaches the src parent or the root path.
-function checkParentPaths (src, srcStat, dest, funcName, cb) {
-  const srcParent = path.resolve(path.dirname(src))
-  const destParent = path.resolve(path.dirname(dest))
-  if (destParent === srcParent || destParent === path.parse(destParent).root) return cb()
-  const callback = (err, destStat) => {
-    if (err) {
-      if (err.code === 'ENOENT') return cb()
-      return cb(err)
-    }
-    if (areIdentical(srcStat, destStat)) {
-      return cb(new Error(errMsg(src, dest, funcName)))
-    }
-    return checkParentPaths(src, srcStat, destParent, funcName, cb)
-  }
-  if (nodeSupportsBigInt) fs.stat(destParent, { bigint: true }, callback)
-  else fs.stat(destParent, callback)
-}
-
-function checkParentPathsSync (src, srcStat, dest, funcName) {
-  const srcParent = path.resolve(path.dirname(src))
-  const destParent = path.resolve(path.dirname(dest))
-  if (destParent === srcParent || destParent === path.parse(destParent).root) return
-  let destStat
-  try {
-    destStat = statSync(destParent)
-  } catch (err) {
-    if (err.code === 'ENOENT') return
-    throw err
-  }
-  if (areIdentical(srcStat, destStat)) {
-    throw new Error(errMsg(src, dest, funcName))
-  }
-  return checkParentPathsSync(src, srcStat, destParent, funcName)
-}
-
-function areIdentical (srcStat, destStat) {
-  if (destStat.ino && destStat.dev && destStat.ino === srcStat.ino && destStat.dev === srcStat.dev) {
-    if (nodeSupportsBigInt || destStat.ino < Number.MAX_SAFE_INTEGER) {
-      // definitive answer
-      return true
-    }
-    // Use additional heuristics if we can't use 'bigint'.
-    // Different 'ino' could be represented the same if they are >= Number.MAX_SAFE_INTEGER
-    // See issue 657
-    if (destStat.size === srcStat.size &&
-        destStat.mode === srcStat.mode &&
-        destStat.nlink === srcStat.nlink &&
-        destStat.atimeMs === srcStat.atimeMs &&
-        destStat.mtimeMs === srcStat.mtimeMs &&
-        destStat.ctimeMs === srcStat.ctimeMs &&
-        destStat.birthtimeMs === srcStat.birthtimeMs) {
-      // heuristic answer
-      return true
-    }
-  }
-  return false
-}
-
-// return true if dest is a subdir of src, otherwise false.
-// It only checks the path strings.
-function isSrcSubdir (src, dest) {
-  const srcArr = path.resolve(src).split(path.sep).filter(i => i)
-  const destArr = path.resolve(dest).split(path.sep).filter(i => i)
-  return srcArr.reduce((acc, cur, i) => acc && destArr[i] === cur, true)
-}
-
-function errMsg (src, dest, funcName) {
-  return `Cannot ${funcName} '${src}' to a subdirectory of itself, '${dest}'.`
-}
-
-module.exports = {
-  checkPaths,
-  checkPathsSync,
-  checkParentPaths,
-  checkParentPathsSync,
-  isSrcSubdir
-}
-
-
-/***/ }),
+/* 934 */,
 /* 935 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -37789,32 +37304,7 @@ function extend() {
 /***/ }),
 /* 941 */,
 /* 942 */,
-/* 943 */
-/***/ (function(module) {
-
-"use strict";
-
-
-module.exports = clone
-
-function clone (obj) {
-  if (obj === null || typeof obj !== 'object')
-    return obj
-
-  if (obj instanceof Object)
-    var copy = { __proto__: obj.__proto__ }
-  else
-    var copy = Object.create(null)
-
-  Object.getOwnPropertyNames(obj).forEach(function (key) {
-    Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(obj, key))
-  })
-
-  return copy
-}
-
-
-/***/ }),
+/* 943 */,
 /* 944 */
 /***/ (function(module) {
 
@@ -38015,7 +37505,459 @@ exports.checkBypass = checkBypass;
 
 
 /***/ }),
-/* 951 */,
+/* 951 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var trim = __webpack_require__(860)
+var repeat = __webpack_require__(8)
+var decimal = __webpack_require__(926)
+var getIndent = __webpack_require__(739)
+var removeIndent = __webpack_require__(584)
+var interrupt = __webpack_require__(853)
+
+module.exports = list
+
+var asterisk = '*'
+var underscore = '_'
+var plusSign = '+'
+var dash = '-'
+var dot = '.'
+var space = ' '
+var lineFeed = '\n'
+var tab = '\t'
+var rightParenthesis = ')'
+var lowercaseX = 'x'
+
+var tabSize = 4
+var looseListItemExpression = /\n\n(?!\s*$)/
+var taskItemExpression = /^\[([ X\tx])][ \t]/
+var bulletExpression = /^([ \t]*)([*+-]|\d+[.)])( {1,4}(?! )| |\t|$|(?=\n))([^\n]*)/
+var pedanticBulletExpression = /^([ \t]*)([*+-]|\d+[.)])([ \t]+)/
+var initialIndentExpression = /^( {1,4}|\t)?/gm
+
+function list(eat, value, silent) {
+  var self = this
+  var commonmark = self.options.commonmark
+  var pedantic = self.options.pedantic
+  var tokenizers = self.blockTokenizers
+  var interuptors = self.interruptList
+  var index = 0
+  var length = value.length
+  var start = null
+  var size
+  var queue
+  var ordered
+  var character
+  var marker
+  var nextIndex
+  var startIndex
+  var prefixed
+  var currentMarker
+  var content
+  var line
+  var previousEmpty
+  var empty
+  var items
+  var allLines
+  var emptyLines
+  var item
+  var enterTop
+  var exitBlockquote
+  var spread = false
+  var node
+  var now
+  var end
+  var indented
+
+  while (index < length) {
+    character = value.charAt(index)
+
+    if (character !== tab && character !== space) {
+      break
+    }
+
+    index++
+  }
+
+  character = value.charAt(index)
+
+  if (character === asterisk || character === plusSign || character === dash) {
+    marker = character
+    ordered = false
+  } else {
+    ordered = true
+    queue = ''
+
+    while (index < length) {
+      character = value.charAt(index)
+
+      if (!decimal(character)) {
+        break
+      }
+
+      queue += character
+      index++
+    }
+
+    character = value.charAt(index)
+
+    if (
+      !queue ||
+      !(character === dot || (commonmark && character === rightParenthesis))
+    ) {
+      return
+    }
+
+    /* Slightly abusing `silent` mode, whose goal is to make interrupting
+     * paragraphs work.
+     * Well, that’s exactly what we want to do here: don’t interrupt:
+     * 2. here, because the “list” doesn’t start with `1`. */
+    if (silent && queue !== '1') {
+      return
+    }
+
+    start = parseInt(queue, 10)
+    marker = character
+  }
+
+  character = value.charAt(++index)
+
+  if (
+    character !== space &&
+    character !== tab &&
+    (pedantic || (character !== lineFeed && character !== ''))
+  ) {
+    return
+  }
+
+  if (silent) {
+    return true
+  }
+
+  index = 0
+  items = []
+  allLines = []
+  emptyLines = []
+
+  while (index < length) {
+    nextIndex = value.indexOf(lineFeed, index)
+    startIndex = index
+    prefixed = false
+    indented = false
+
+    if (nextIndex === -1) {
+      nextIndex = length
+    }
+
+    size = 0
+
+    while (index < length) {
+      character = value.charAt(index)
+
+      if (character === tab) {
+        size += tabSize - (size % tabSize)
+      } else if (character === space) {
+        size++
+      } else {
+        break
+      }
+
+      index++
+    }
+
+    if (item && size >= item.indent) {
+      indented = true
+    }
+
+    character = value.charAt(index)
+    currentMarker = null
+
+    if (!indented) {
+      if (
+        character === asterisk ||
+        character === plusSign ||
+        character === dash
+      ) {
+        currentMarker = character
+        index++
+        size++
+      } else {
+        queue = ''
+
+        while (index < length) {
+          character = value.charAt(index)
+
+          if (!decimal(character)) {
+            break
+          }
+
+          queue += character
+          index++
+        }
+
+        character = value.charAt(index)
+        index++
+
+        if (
+          queue &&
+          (character === dot || (commonmark && character === rightParenthesis))
+        ) {
+          currentMarker = character
+          size += queue.length + 1
+        }
+      }
+
+      if (currentMarker) {
+        character = value.charAt(index)
+
+        if (character === tab) {
+          size += tabSize - (size % tabSize)
+          index++
+        } else if (character === space) {
+          end = index + tabSize
+
+          while (index < end) {
+            if (value.charAt(index) !== space) {
+              break
+            }
+
+            index++
+            size++
+          }
+
+          if (index === end && value.charAt(index) === space) {
+            index -= tabSize - 1
+            size -= tabSize - 1
+          }
+        } else if (character !== lineFeed && character !== '') {
+          currentMarker = null
+        }
+      }
+    }
+
+    if (currentMarker) {
+      if (!pedantic && marker !== currentMarker) {
+        break
+      }
+
+      prefixed = true
+    } else {
+      if (!commonmark && !indented && value.charAt(startIndex) === space) {
+        indented = true
+      } else if (commonmark && item) {
+        indented = size >= item.indent || size > tabSize
+      }
+
+      prefixed = false
+      index = startIndex
+    }
+
+    line = value.slice(startIndex, nextIndex)
+    content = startIndex === index ? line : value.slice(index, nextIndex)
+
+    if (
+      currentMarker === asterisk ||
+      currentMarker === underscore ||
+      currentMarker === dash
+    ) {
+      if (tokenizers.thematicBreak.call(self, eat, line, true)) {
+        break
+      }
+    }
+
+    previousEmpty = empty
+    empty = !prefixed && !trim(content).length
+
+    if (indented && item) {
+      item.value = item.value.concat(emptyLines, line)
+      allLines = allLines.concat(emptyLines, line)
+      emptyLines = []
+    } else if (prefixed) {
+      if (emptyLines.length !== 0) {
+        spread = true
+        item.value.push('')
+        item.trail = emptyLines.concat()
+      }
+
+      item = {
+        value: [line],
+        indent: size,
+        trail: []
+      }
+
+      items.push(item)
+      allLines = allLines.concat(emptyLines, line)
+      emptyLines = []
+    } else if (empty) {
+      if (previousEmpty && !commonmark) {
+        break
+      }
+
+      emptyLines.push(line)
+    } else {
+      if (previousEmpty) {
+        break
+      }
+
+      if (interrupt(interuptors, tokenizers, self, [eat, line, true])) {
+        break
+      }
+
+      item.value = item.value.concat(emptyLines, line)
+      allLines = allLines.concat(emptyLines, line)
+      emptyLines = []
+    }
+
+    index = nextIndex + 1
+  }
+
+  node = eat(allLines.join(lineFeed)).reset({
+    type: 'list',
+    ordered: ordered,
+    start: start,
+    spread: spread,
+    children: []
+  })
+
+  enterTop = self.enterList()
+  exitBlockquote = self.enterBlock()
+  index = -1
+  length = items.length
+
+  while (++index < length) {
+    item = items[index].value.join(lineFeed)
+    now = eat.now()
+
+    eat(item)(listItem(self, item, now), node)
+
+    item = items[index].trail.join(lineFeed)
+
+    if (index !== length - 1) {
+      item += lineFeed
+    }
+
+    eat(item)
+  }
+
+  enterTop()
+  exitBlockquote()
+
+  return node
+}
+
+function listItem(ctx, value, position) {
+  var offsets = ctx.offset
+  var fn = ctx.options.pedantic ? pedanticListItem : normalListItem
+  var checked = null
+  var task
+  var indent
+
+  value = fn.apply(null, arguments)
+
+  if (ctx.options.gfm) {
+    task = value.match(taskItemExpression)
+
+    if (task) {
+      indent = task[0].length
+      checked = task[1].toLowerCase() === lowercaseX
+      offsets[position.line] += indent
+      value = value.slice(indent)
+    }
+  }
+
+  return {
+    type: 'listItem',
+    spread: looseListItemExpression.test(value),
+    checked: checked,
+    children: ctx.tokenizeBlock(value, position)
+  }
+}
+
+// Create a list-item using overly simple mechanics.
+function pedanticListItem(ctx, value, position) {
+  var offsets = ctx.offset
+  var line = position.line
+
+  // Remove the list-item’s bullet.
+  value = value.replace(pedanticBulletExpression, replacer)
+
+  // The initial line was also matched by the below, so we reset the `line`.
+  line = position.line
+
+  return value.replace(initialIndentExpression, replacer)
+
+  // A simple replacer which removed all matches, and adds their length to
+  // `offset`.
+  function replacer($0) {
+    offsets[line] = (offsets[line] || 0) + $0.length
+    line++
+
+    return ''
+  }
+}
+
+// Create a list-item using sane mechanics.
+function normalListItem(ctx, value, position) {
+  var offsets = ctx.offset
+  var line = position.line
+  var max
+  var bullet
+  var rest
+  var lines
+  var trimmedLines
+  var index
+  var length
+
+  // Remove the list-item’s bullet.
+  value = value.replace(bulletExpression, replacer)
+
+  lines = value.split(lineFeed)
+
+  trimmedLines = removeIndent(value, getIndent(max).indent).split(lineFeed)
+
+  // We replaced the initial bullet with something else above, which was used
+  // to trick `removeIndentation` into removing some more characters when
+  // possible.  However, that could result in the initial line to be stripped
+  // more than it should be.
+  trimmedLines[0] = rest
+
+  offsets[line] = (offsets[line] || 0) + bullet.length
+  line++
+
+  index = 0
+  length = lines.length
+
+  while (++index < length) {
+    offsets[line] =
+      (offsets[line] || 0) + lines[index].length - trimmedLines[index].length
+    line++
+  }
+
+  return trimmedLines.join(lineFeed)
+
+  /* eslint-disable-next-line max-params */
+  function replacer($0, $1, $2, $3, $4) {
+    bullet = $1 + $2 + $3
+    rest = $4
+
+    // Make sure that the first nine numbered list items can indent with an
+    // extra space.  That is, when the bullet did not receive an extra final
+    // space.
+    if (Number($2) < 10 && bullet.length % 2 === 1) {
+      $2 = space + $2
+    }
+
+    max = $1 + repeat(space, $2.length) + $3
+
+    return max + rest
+  }
+}
+
+
+/***/ }),
 /* 952 */,
 /* 953 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -38446,7 +38388,7 @@ module.exports = {
 "use strict";
 
 
-var visit = __webpack_require__(872)
+var visit = __webpack_require__(105)
 
 module.exports = removePosition
 
@@ -38930,8 +38872,66 @@ module.exports = isObject;
 
 
 /***/ }),
-/* 989 */,
-/* 990 */,
+/* 989 */
+/***/ (function(module) {
+
+/**
+ * Creates a base function for methods like `_.forIn` and `_.forOwn`.
+ *
+ * @private
+ * @param {boolean} [fromRight] Specify iterating from right to left.
+ * @returns {Function} Returns the new base function.
+ */
+function createBaseFor(fromRight) {
+  return function(object, iteratee, keysFunc) {
+    var index = -1,
+        iterable = Object(object),
+        props = keysFunc(object),
+        length = props.length;
+
+    while (length--) {
+      var key = props[fromRight ? length : ++index];
+      if (iteratee(iterable[key], key, iterable) === false) {
+        break;
+      }
+    }
+    return object;
+  };
+}
+
+module.exports = createBaseFor;
+
+
+/***/ }),
+/* 990 */
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = blockquote
+
+var lineFeed = '\n'
+var space = ' '
+var greaterThan = '>'
+
+function blockquote(node) {
+  var values = this.block(node).split(lineFeed)
+  var result = []
+  var length = values.length
+  var index = -1
+  var value
+
+  while (++index < length) {
+    value = values[index]
+    result[index] = (value ? space : '') + value
+  }
+
+  return greaterThan + result.join(lineFeed + greaterThan)
+}
+
+
+/***/ }),
 /* 991 */
 /***/ (function(module) {
 
