@@ -50,13 +50,8 @@ The `tasks` key is an array of tasks, the event that triggers them, and their co
 
 ##### Tasks
 
-- `add-comment`: Add a comment to an issue
+- `add-comment`: Add a comment to an issue, optionally closing and/or locking the issue
   - `comment` _(string)_: the comment text
-  - `close` _(boolean)_: if `true`, close the issue
-  - `lock` _(boolean)_: if `true`, lock the issue
-- `add-comment-for-label`: Make a comment when a label is added, optionally closing and/or locking the issue
-  - `name` _(string)_: the name of the label
-  - `comment` _(string)_: the comment text. if `undefined`, the comment is not added
   - `close` _(boolean)_: if `true`, close the issue
   - `lock` _(boolean)_: if `true`, lock the issue
 - `add-contributors`: Open a PR to modify `README.md` when a new contributor appears in a base branch
