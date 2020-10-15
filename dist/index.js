@@ -20529,7 +20529,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.replaceRange = (str, start, end, replacement) => {
     return str.substring(0, start) + replacement + str.substring(end);
 };
-exports.createFilterByPattern = (re) => (s) => re.test(s);
+exports.createFilterByPatterns = (regexes) => (s) => regexes.some(re => re.test(s));
 
 
 /***/ }),
@@ -24802,19 +24802,21 @@ const template_1 = __importDefault(__webpack_require__(838));
 const contributors_1 = __webpack_require__(6);
 const markdown_1 = __webpack_require__(592);
 const str_1 = __webpack_require__(508);
-const run = async (client, { base = 'master', file = 'README.md', 'commit-message': commitMessage = 'add new contributor(s) to <%= file %>', 'exclude-pattern': excludePattern = '^.+(?<!\\[bot\\])$', }) => {
+const run = async (client, { base = 'master', file = 'README.md', 'commit-message': commitMessage = 'add new contributor(s) to <%= file %>', 'exclude-patterns': excludePatterns = ['\\[bot\\]$'], }) => {
     if (github.context.ref !== `refs/heads/${base}`) {
         core.info(`not processing for ref: ${github.context.ref}`);
         return;
     }
     const { commits } = github.context.payload;
     core.info(`processing commits: ${commits.map((commit) => commit.id).join(', ')}`);
-    const authorFilter = str_1.createFilterByPattern(new RegExp(excludePattern));
+    const excludeAuthorRegexes = excludePatterns.map(p => new RegExp(p));
+    core.info(`excluded author regexes: ${excludeAuthorRegexes.join(', ')}`);
+    const authorFilter = str_1.createFilterByPatterns(excludeAuthorRegexes);
     const authors = commits
         .map((commit) => commit.author)
-        .filter((author) => authorFilter(author.username));
+        .filter((author) => !authorFilter(author.username));
     if (authors.length === 0) {
-        core.warning(`no human authors found for commits!`);
+        core.warning(`no authors found for commits!`);
         return;
     }
     const authorUsernames = authors.map((author) => author.username);

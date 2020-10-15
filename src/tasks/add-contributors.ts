@@ -12,13 +12,13 @@ import {
   findSectionByLooseTitle,
   parseMarkdownIntoSections,
 } from '../utils/markdown';
-import { createFilterByPattern, replaceRange } from '../utils/str';
+import { createFilterByPatterns, replaceRange } from '../utils/str';
 
 export interface AddContributorsConfig {
   base?: string;
   file?: string;
   'commit-message'?: string;
-  'exclude-pattern'?: string;
+  'exclude-patterns'?: string[];
 }
 
 export type AddContributorsTask = Task<
@@ -32,7 +32,7 @@ const run = async (
     base = 'master',
     file = 'README.md',
     'commit-message': commitMessage = 'add new contributor(s) to <%= file %>',
-    'exclude-pattern': excludePattern = '^.+(?<!\\[bot\\])$',
+    'exclude-patterns': excludePatterns = ['\\[bot\\]$'],
   }: AddContributorsConfig,
 ): Promise<void> => {
   if (github.context.ref !== `refs/heads/${base}`) {
@@ -45,14 +45,18 @@ const run = async (
     `processing commits: ${commits.map((commit: any) => commit.id).join(', ')}`,
   );
 
-  const authorFilter = createFilterByPattern(new RegExp(excludePattern));
+  const excludeAuthorRegexes = excludePatterns.map(p => new RegExp(p));
+
+  core.info(`excluded author regexes: ${excludeAuthorRegexes.join(', ')}`);
+
+  const authorFilter = createFilterByPatterns(excludeAuthorRegexes);
 
   const authors = commits
     .map((commit: any) => commit.author)
-    .filter((author: any) => authorFilter(author.username));
+    .filter((author: any) => !authorFilter(author.username));
 
   if (authors.length === 0) {
-    core.warning(`no human authors found for commits!`);
+    core.warning(`no authors found for commits!`);
     return;
   }
 

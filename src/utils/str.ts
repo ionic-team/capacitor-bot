@@ -7,5 +7,6 @@ export const replaceRange = (
   return str.substring(0, start) + replacement + str.substring(end);
 };
 
-export const createFilterByPattern = (re: RegExp) => (s: string): boolean =>
-  re.test(s);
+export const createFilterByPatterns = (regexes: RegExp[]) => (
+  s: string,
+): boolean => regexes.some(re => re.test(s));
