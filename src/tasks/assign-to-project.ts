@@ -7,6 +7,8 @@ import type { Task } from '../config';
 export interface AssignToProjectConfig {
   readonly label: string;
   readonly 'column-id': number;
+  readonly org: string;
+  readonly 'team-slug': string;
 }
 
 export type AssignToProjectTask = Task<
@@ -16,9 +18,22 @@ export type AssignToProjectTask = Task<
 
 const run = async (
   client: GitHubClient,
-  { label, 'column-id': columnId }: AssignToProjectConfig,
+  {
+    label,
+    'column-id': columnId,
+    org,
+    'team-slug': teamSlug,
+  }: AssignToProjectConfig,
 ): Promise<void> => {
-
+  const teamMembers = await client.request(
+    '/orgs/{org}/teams/{teamSlug}/members',
+    {
+      org,
+      teamSlug,
+    },
+  );
+  console.log({org, teamSlug})
+  console.log(teamMembers.data);
   await client.projects.createCard({
     column_id: columnId,
     content_type: 'Issue',

@@ -14650,7 +14650,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
-const run = async (client, { label, 'column-id': columnId }) => {
+const run = async (client, { label, 'column-id': columnId, org, 'team-slug': teamSlug, }) => {
+    const teamMembers = await client.request('/orgs/{org}/teams/{teamSlug}/members', {
+        org,
+        teamSlug,
+    });
+    console.log({ org, teamSlug });
+    console.log(teamMembers.data);
     await client.projects.createCard({
         column_id: columnId,
         content_type: 'Issue',
