@@ -14657,7 +14657,7 @@ const run = async (client, { label, 'column-id': columnId, 'only-members-of-team
             org,
             teamSlug: onlyMembersOfTeamSlug,
         });
-        const isMemberInTeam = teamMembers.data.any((x) => x.login === github.context.payload.issue.user.login);
+        const isMemberInTeam = teamMembers.data.some((x) => x.login === github.context.payload.issue.user.login);
         if (isMemberInTeam) {
             await client.projects.createCard({
                 column_id: columnId,
