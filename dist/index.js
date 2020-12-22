@@ -14635,7 +14635,33 @@ module.exports = isMap;
 
 /***/ }),
 /* 402 */,
-/* 403 */,
+/* 403 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
+const run = async (client, { label, 'column-id': columnId }) => {
+    console.log(github.context.payload);
+    await client.projects.createCard({
+        column_id: columnId,
+        content_id: github.context.issue.number,
+    });
+    core.info(`added ${label} label to issue #${github.context.issue.number}`);
+};
+exports.default = run;
+
+
+/***/ }),
 /* 404 */,
 /* 405 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -20298,6 +20324,7 @@ const add_comment_for_label_1 = __importDefault(__webpack_require__(475));
 const add_contributors_1 = __importDefault(__webpack_require__(659));
 const add_label_1 = __importDefault(__webpack_require__(286));
 const add_platform_labels_1 = __importDefault(__webpack_require__(243));
+const assign_to_project_1 = __importDefault(__webpack_require__(403));
 const remove_label_1 = __importDefault(__webpack_require__(599));
 exports.runTask = async (client, task) => {
     switch (task.name) {
@@ -20313,6 +20340,8 @@ exports.runTask = async (client, task) => {
             return add_platform_labels_1.default(client, task.config);
         case 'add-contributors':
             return add_contributors_1.default(client, task.config);
+        case 'assign-to-project':
+            return assign_to_project_1.default(client, task.config);
         default:
             throw new Error(`Task ${task.name} not found`);
     }
