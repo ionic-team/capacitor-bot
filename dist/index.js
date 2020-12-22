@@ -15606,7 +15606,7 @@ const run = async () => {
             return;
         }
         for (const task of tasks) {
-            if (!task.condition || tasks_1.evaluateCondition(task.condition, { payload })) {
+            if (!task.condition || tasks_1.evaluateCondition(task.condition, { payload, config: task.config })) {
                 core.info(`running ${task.name} task for ${event} event`);
                 await tasks_1.runTask(client, task);
             }
