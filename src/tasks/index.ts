@@ -29,6 +29,8 @@ export const runTask = async (
       return addPlatformLabels(client, task.config);
     case 'add-contributors':
       return addContributors(client, task.config);
+    default:
+      throw new Error(`Task ${(task as any).name} not found`);
   }
 };
 
