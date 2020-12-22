@@ -29,7 +29,7 @@ const run = async (): Promise<void> => {
     }
 
     for (const task of tasks) {
-      if (!task.condition || evaluateCondition(task.condition, { payload })) {
+      if (!task.condition || evaluateCondition(task.condition, { payload, config: task.config })) {
         core.info(`running ${task.name} task for ${event} event`);
         await runTask(client, task);
       }
