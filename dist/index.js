@@ -20313,6 +20313,8 @@ exports.runTask = async (client, task) => {
             return add_platform_labels_1.default(client, task.config);
         case 'add-contributors':
             return add_contributors_1.default(client, task.config);
+        default:
+            throw new Error(`Task ${task.name} not found`);
     }
 };
 exports.createTriggeredBy = (event, type) => (task) => {
