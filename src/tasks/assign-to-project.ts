@@ -5,7 +5,6 @@ import type { GitHubClient } from '../client';
 import type { Task } from '../config';
 
 export interface AssignToProjectConfig {
-  readonly label: string;
   readonly 'column-id': number;
   readonly 'only-members-of-team-slug'?: string;
 }
@@ -18,13 +17,13 @@ export type AssignToProjectTask = Task<
 const run = async (
   client: GitHubClient,
   {
-    label,
     'column-id': columnId,
     'only-members-of-team-slug': onlyMembersOfTeamSlug,
   }: AssignToProjectConfig,
 ): Promise<void> => {
   if (onlyMembersOfTeamSlug) {
     const org = github.context.repo.owner;
+    const login = (github.context.payload.issue as any).user.login;
     const teamMembers = await client.request(
       '/orgs/{org}/teams/{teamSlug}/members',
       {
@@ -33,25 +32,24 @@ const run = async (
       },
     );
     const isMemberInTeam = teamMembers.data.some(
-      (x: any) => x.login === (github.context.payload.issue as any).user.login,
+      (x: any) => x.login === login,
     );
 
-    if (isMemberInTeam) {
-      await client.projects.createCard({
-        column_id: columnId,
-        content_type: 'Issue',
-        content_id: (github.context.payload.issue as any).id,
-      });
+    if (!isMemberInTeam) {
+      core.info(`User ${login} was not in the team, issue was not added to project column ${columnId}`)
+      return;
     }
-  } else {
-    await client.projects.createCard({
-      column_id: columnId,
-      content_type: 'Issue',
-      content_id: (github.context.payload.issue as any).id,
-    });
   }
 
-  core.info(`added ${label} label to issue #${github.context.issue.number}`);
+  await client.projects.createCard({
+    column_id: columnId,
+    content_type: 'Issue',
+    content_id: (github.context.payload.issue as any).id,
+  });
+
+  core.info(
+    `added issue #${github.context.issue.number} to project column ${columnId}`,
+  );
 };
 
 export default run;
