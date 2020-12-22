@@ -9,17 +9,21 @@ export interface AssignToProjectConfig {
   readonly 'column-id': number;
 }
 
-export type AssignToProjectTask = Task<'assign-to-project', AssignToProjectConfig>;
+export type AssignToProjectTask = Task<
+  'assign-to-project',
+  AssignToProjectConfig
+>;
 
 const run = async (
   client: GitHubClient,
-  { label, "column-id": columnId }: AssignToProjectConfig,
+  { label, 'column-id': columnId }: AssignToProjectConfig,
 ): Promise<void> => {
+  console.log(github.context.payload);
   await client.projects.createCard({
     column_id: columnId,
-    content_id: github.context.issue.number
-  })
-  console.log(github.context.payload)
+    content_id: github.context.issue.number,
+  });
+
   core.info(`added ${label} label to issue #${github.context.issue.number}`);
 };
 

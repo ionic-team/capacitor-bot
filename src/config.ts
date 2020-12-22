@@ -7,6 +7,7 @@ import type { AddCommentForLabelTask } from './tasks/add-comment-for-label';
 import type { AddContributorsTask } from './tasks/add-contributors';
 import type { AddLabelTask } from './tasks/add-label';
 import type { AddPlatformLabelsTask } from './tasks/add-platform-labels';
+import type { AssignToProjectTask } from './tasks/assign-to-project';
 import type { RemoveLabelTask } from './tasks/remove-label';
 
 export interface TriggerObject {
@@ -33,7 +34,8 @@ export type AnyTask =
   | AddLabelTask
   | RemoveLabelTask
   | AddPlatformLabelsTask
-  | AddContributorsTask;
+  | AddContributorsTask
+  | AssignToProjectTask;
 
 export interface Config {
   readonly tasks: readonly AnyTask[];

@@ -10,6 +10,7 @@ import addCommentForLabel from './add-comment-for-label';
 import addContributors from './add-contributors';
 import addLabel from './add-label';
 import addPlatformLabels from './add-platform-labels';
+import assignToProject from './assign-to-project';
 import removeLabel from './remove-label';
 
 export const runTask = async (
@@ -29,6 +30,8 @@ export const runTask = async (
       return addPlatformLabels(client, task.config);
     case 'add-contributors':
       return addContributors(client, task.config);
+    case 'assign-to-project':
+      return assignToProject(client, task.config);
     default:
       throw new Error(`Task ${(task as any).name} not found`);
   }
