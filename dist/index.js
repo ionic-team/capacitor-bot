@@ -14654,7 +14654,8 @@ const run = async (client, { label, 'column-id': columnId }) => {
     console.log(github.context.payload);
     await client.projects.createCard({
         column_id: columnId,
-        content_id: github.context.issue.number,
+        content_type: 'Issue',
+        content_id: github.context.payload.issue.id,
     });
     core.info(`added ${label} label to issue #${github.context.issue.number}`);
 };
