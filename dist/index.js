@@ -14651,7 +14651,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const run = async (client, { label, 'column-id': columnId }) => {
-    console.log(github.context.payload);
     await client.projects.createCard({
         column_id: columnId,
         content_type: 'Issue',

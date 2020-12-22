@@ -18,7 +18,7 @@ const run = async (
   client: GitHubClient,
   { label, 'column-id': columnId }: AssignToProjectConfig,
 ): Promise<void> => {
-  console.log(github.context.payload);
+
   await client.projects.createCard({
     column_id: columnId,
     content_type: 'Issue',
