@@ -32,7 +32,7 @@ const run = async (
         teamSlug: onlyMembersOfTeamSlug,
       },
     );
-    const isMemberInTeam = teamMembers.data.any(
+    const isMemberInTeam = teamMembers.data.some(
       (x: any) => x.login === (github.context.payload.issue as any).user.login,
     );
 
