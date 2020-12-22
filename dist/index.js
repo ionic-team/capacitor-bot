@@ -14650,18 +14650,29 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
-const run = async (client, { label, 'column-id': columnId, org, 'team-slug': teamSlug, }) => {
-    const teamMembers = await client.request('/orgs/{org}/teams/{teamSlug}/members', {
-        org,
-        teamSlug,
-    });
-    console.log({ org, teamSlug });
-    console.log(teamMembers.data);
-    await client.projects.createCard({
-        column_id: columnId,
-        content_type: 'Issue',
-        content_id: github.context.payload.issue.id,
-    });
+const run = async (client, { label, 'column-id': columnId, 'only-members-of-team-slug': onlyMembersOfTeamSlug, }) => {
+    if (onlyMembersOfTeamSlug) {
+        const org = github.context.repo.owner;
+        const teamMembers = await client.request('/orgs/{org}/teams/{teamSlug}/members', {
+            org,
+            teamSlug: onlyMembersOfTeamSlug,
+        });
+        const isMemberInTeam = teamMembers.data.any((x) => x.login === github.context.payload.issue.user.login);
+        if (isMemberInTeam) {
+            await client.projects.createCard({
+                column_id: columnId,
+                content_type: 'Issue',
+                content_id: github.context.payload.issue.id,
+            });
+        }
+    }
+    else {
+        await client.projects.createCard({
+            column_id: columnId,
+            content_type: 'Issue',
+            content_id: github.context.payload.issue.id,
+        });
+    }
     core.info(`added ${label} label to issue #${github.context.issue.number}`);
 };
 exports.default = run;
