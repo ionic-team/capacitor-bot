@@ -14650,13 +14650,26 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
-const run = async (client, { label, 'column-id': columnId }) => {
+const run = async (client, { 'column-id': columnId, 'only-members-of-team-slug': onlyMembersOfTeamSlug, }) => {
+    if (onlyMembersOfTeamSlug) {
+        const org = github.context.repo.owner;
+        const login = github.context.payload.issue.user.login;
+        const teamMembers = await client.request('/orgs/{org}/teams/{teamSlug}/members', {
+            org,
+            teamSlug: onlyMembersOfTeamSlug,
+        });
+        const isMemberInTeam = teamMembers.data.some((x) => x.login === login);
+        if (!isMemberInTeam) {
+            core.info(`User ${login} was not in the team, issue was not added to project column ${columnId}`);
+            return;
+        }
+    }
     await client.projects.createCard({
         column_id: columnId,
         content_type: 'Issue',
         content_id: github.context.payload.issue.id,
     });
-    core.info(`added ${label} label to issue #${github.context.issue.number}`);
+    core.info(`added issue #${github.context.issue.number} to project column ${columnId}`);
 };
 exports.default = run;
 
