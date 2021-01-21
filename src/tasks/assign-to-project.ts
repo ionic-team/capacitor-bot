@@ -6,7 +6,6 @@ import type { Task } from '../config';
 
 export interface AssignToProjectConfig {
   readonly 'column-id': number;
-  readonly 'only-members-of-team-slug'?: string;
 }
 
 export type AssignToProjectTask = Task<
@@ -16,31 +15,8 @@ export type AssignToProjectTask = Task<
 
 const run = async (
   client: GitHubClient,
-  {
-    'column-id': columnId,
-    'only-members-of-team-slug': onlyMembersOfTeamSlug,
-  }: AssignToProjectConfig,
+  { 'column-id': columnId }: AssignToProjectConfig,
 ): Promise<void> => {
-  if (onlyMembersOfTeamSlug) {
-    const org = github.context.repo.owner;
-    const login = (github.context.payload.issue as any).user.login;
-    const teamMembers = await client.request(
-      '/orgs/{org}/teams/{teamSlug}/members',
-      {
-        org,
-        teamSlug: onlyMembersOfTeamSlug,
-      },
-    );
-    const isMemberInTeam = teamMembers.data.some(
-      (x: any) => x.login === login,
-    );
-
-    if (!isMemberInTeam) {
-      core.info(`User ${login} was not in the team, issue was not added to project column ${columnId}`)
-      return;
-    }
-  }
-
   await client.projects.createCard({
     column_id: columnId,
     content_type: 'Issue',
