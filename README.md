@@ -6,7 +6,7 @@ The bot for Ionic and Capacitor repos, implemented using GitHub Actions.
 
 There are two steps to setting up the configuration for this bot.
 
-#### Workflow File
+### Workflow File
 
 Add a GitHub Actions workflow file for the bot (usually `.github/workflows/bot.yml`).
 
@@ -30,7 +30,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-#### Config File
+### Config File
 
 Though this bot is one GitHub Action, it does many things. Because of this, a separate configuration file is needed specifically for the bot (`.github/bot.yml`):
 
@@ -48,7 +48,7 @@ tasks:
 
 The `tasks` key is an array of tasks, the event that triggers them, and their configuration. Notice how the `on` block is copied from the workflow file to specify exactly which events triggers which tasks. You can also have a `condition` expression, the result of which determines if the task is run for a particular event payload.
 
-##### Tasks
+#### Tasks
 
 - `add-comment`: Add a comment to an issue, optionally closing and/or locking the issue
   - `comment` _(string)_: the comment text
@@ -65,3 +65,13 @@ The `tasks` key is an array of tasks, the event that triggers them, and their co
 - `remove-label`: Remove a label from an issue
   - `label` _(string)_: the label to remove
   - `exclude-labeler` _(boolean)_: if `true`, the label won't be removed if the event actor is the user that added the label
+- `assign-to-project`: Assign an issue to a project
+  - `column-id` _(number)_: the project column ID to put the issue in
+
+#### Condition Context
+
+There are a variety of variables and functions available in `condition` expressions.
+
+- `payload`: the entire event payload
+- `config`: the task configuration
+- `getTeamMembers(teamSlug: string) => Promise<string[]>`: get the usernames of an organization team by slug
