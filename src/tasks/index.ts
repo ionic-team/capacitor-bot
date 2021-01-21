@@ -1,7 +1,3 @@
-import * as core from '@actions/core';
-import * as util from 'util';
-import * as vm from 'vm';
-
 import type { GitHubClient } from '../client';
 import type { AnyTask, Task } from '../config';
 
@@ -65,27 +61,6 @@ export const createTriggeredBy = (event: string, type?: string) => (
   // TODO: branches and tags are not supported yet
   if (event === 'push' || event === 'pull_request') {
     return true;
-  }
-
-  return false;
-};
-
-export const evaluateCondition = (
-  condition: string,
-  context: { [key: string]: any },
-): boolean => {
-  core.info(
-    `evaluating condition '${condition}' with context ${util.format(context)}`,
-  );
-
-  try {
-    vm.createContext(context);
-    const result = !!vm.runInContext(condition, context);
-    core.info(`condition '${condition}' ${result ? 'met' : 'unmet'}`);
-
-    return result;
-  } catch (e) {
-    core.error(e);
   }
 
   return false;

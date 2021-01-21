@@ -45,3 +45,19 @@ export const createComment = async (
     core.info(`locked issue #${github.context.issue.number}`);
   }
 };
+
+export const getTeamMembers = async (
+  client: GitHubClient,
+  teamSlug: string,
+): Promise<string[]> => {
+  const org = github.context.repo.owner;
+  const response = await client.request(
+    '/orgs/{org}/teams/{teamSlug}/members',
+    {
+      org,
+      teamSlug,
+    },
+  );
+
+  return response.data.map((member: any) => member.login);
+};

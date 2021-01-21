@@ -1335,7 +1335,39 @@ function retry () {
 
 /***/ }),
 /* 26 */,
-/* 27 */,
+/* 27 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const util = __importStar(__webpack_require__(669));
+const vm = __importStar(__webpack_require__(641));
+exports.evaluateCondition = async (condition, context) => {
+    core.info(`evaluating condition '${condition}' with context ${util.format(context)}`);
+    try {
+        vm.createContext(context);
+        const container = `(async () => ${condition})()`;
+        const result = await vm.runInContext(container, context);
+        core.info(`condition '${condition}' ${result ? 'met' : 'unmet'}`);
+        return result;
+    }
+    catch (e) {
+        core.error(e);
+    }
+    return false;
+};
+
+
+/***/ }),
 /* 28 */,
 /* 29 */,
 /* 30 */,
@@ -1824,7 +1856,62 @@ module.exports = baseGetTag;
 
 
 /***/ }),
-/* 52 */,
+/* 52 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var baseRest = __webpack_require__(272),
+    createWrap = __webpack_require__(227),
+    getHolder = __webpack_require__(683),
+    replaceHolders = __webpack_require__(944);
+
+/** Used to compose bitmasks for function metadata. */
+var WRAP_PARTIAL_FLAG = 32;
+
+/**
+ * Creates a function that invokes `func` with `partials` prepended to the
+ * arguments it receives. This method is like `_.bind` except it does **not**
+ * alter the `this` binding.
+ *
+ * The `_.partial.placeholder` value, which defaults to `_` in monolithic
+ * builds, may be used as a placeholder for partially applied arguments.
+ *
+ * **Note:** This method doesn't set the "length" property of partially
+ * applied functions.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.2.0
+ * @category Function
+ * @param {Function} func The function to partially apply arguments to.
+ * @param {...*} [partials] The arguments to be partially applied.
+ * @returns {Function} Returns the new partially applied function.
+ * @example
+ *
+ * function greet(greeting, name) {
+ *   return greeting + ' ' + name;
+ * }
+ *
+ * var sayHelloTo = _.partial(greet, 'hello');
+ * sayHelloTo('fred');
+ * // => 'hello fred'
+ *
+ * // Partially applied with placeholders.
+ * var greetFred = _.partial(greet, _, 'fred');
+ * greetFred('hi');
+ * // => 'hi fred'
+ */
+var partial = baseRest(function(func, partials) {
+  var holders = replaceHolders(partials, getHolder(partial));
+  return createWrap(func, WRAP_PARTIAL_FLAG, undefined, partials, holders);
+});
+
+// Assign default placeholders.
+partial.placeholder = {};
+
+module.exports = partial;
+
+
+/***/ }),
 /* 53 */,
 /* 54 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -6160,6 +6247,14 @@ exports.createComment = async (client, options) => {
         core.info(`locked issue #${github.context.issue.number}`);
     }
 };
+exports.getTeamMembers = async (client, teamSlug) => {
+    const org = github.context.repo.owner;
+    const response = await client.request('/orgs/{org}/teams/{teamSlug}/members', {
+        org,
+        teamSlug,
+    });
+    return response.data.map((member) => member.login);
+};
 
 
 /***/ }),
@@ -6246,9 +6341,49 @@ module.exports = new Type('tag:yaml.org,2002:omap', {
 /* 182 */,
 /* 183 */,
 /* 184 */
-/***/ (function(module) {
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-module.exports = require("vm");
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const remark_1 = __importDefault(__webpack_require__(781));
+exports.parseMarkdownIntoSections = (markdown) => {
+    const nodes = exports.parseMarkdown(markdown);
+    const sections = [];
+    for (const node of nodes) {
+        if (node.type === 'heading') {
+            sections.push({
+                title: node.children[0].value,
+                nodes: getSectionNodes(node, nodes),
+            });
+        }
+    }
+    return { sections };
+};
+exports.findSectionByLooseTitle = (sections, title) => {
+    return sections.find(section => section.title.toLowerCase().includes(title.toLowerCase()));
+};
+exports.parseMarkdown = (markdown) => {
+    const lexer = remark_1.default();
+    const nodes = lexer.parse(markdown).children;
+    return nodes;
+};
+const getSectionNodes = (header, nodes) => {
+    const section = [header];
+    const idx = nodes.indexOf(header);
+    for (let i = idx + 1; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node.type === 'heading') {
+            break;
+        }
+        section.push(node);
+    }
+    return section;
+};
+
 
 /***/ }),
 /* 185 */,
@@ -7742,7 +7877,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const issues_1 = __webpack_require__(244);
-const markdown_1 = __webpack_require__(592);
+const markdown_1 = __webpack_require__(184);
 const run = async (client, config) => {
     const { issue } = github.context.payload;
     if (!issue || !issue.body) {
@@ -14650,20 +14785,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
-const run = async (client, { 'column-id': columnId, 'only-members-of-team-slug': onlyMembersOfTeamSlug, }) => {
-    if (onlyMembersOfTeamSlug) {
-        const org = github.context.repo.owner;
-        const login = github.context.payload.issue.user.login;
-        const teamMembers = await client.request('/orgs/{org}/teams/{teamSlug}/members', {
-            org,
-            teamSlug: onlyMembersOfTeamSlug,
-        });
-        const isMemberInTeam = teamMembers.data.some((x) => x.login === login);
-        if (!isMemberInTeam) {
-            core.info(`User ${login} was not in the team, issue was not added to project column ${columnId}`);
-            return;
-        }
-    }
+const run = async (client, { 'column-id': columnId }) => {
     await client.projects.createCard({
         column_id: columnId,
         content_type: 'Issue',
@@ -15594,12 +15716,18 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
+const partial_1 = __importDefault(__webpack_require__(877));
 const client_1 = __webpack_require__(505);
 const config_1 = __webpack_require__(195);
 const tasks_1 = __webpack_require__(504);
+const github_1 = __webpack_require__(177);
+const vm_1 = __webpack_require__(27);
 const run = async () => {
     try {
         const { eventName, payload } = github.context;
@@ -15618,7 +15746,12 @@ const run = async () => {
             return;
         }
         for (const task of tasks) {
-            if (!task.condition || tasks_1.evaluateCondition(task.condition, { payload, config: task.config })) {
+            if (!task.condition ||
+                (await vm_1.evaluateCondition(task.condition, {
+                    payload,
+                    config: task.config,
+                    getTeamMembers: partial_1.default(github_1.getTeamMembers, client),
+                }))) {
                 core.info(`running ${task.name} task for ${event} event`);
                 await tasks_1.runTask(client, task);
             }
@@ -20318,20 +20451,10 @@ module.exports = toKey;
 
 "use strict";
 
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const core = __importStar(__webpack_require__(470));
-const util = __importStar(__webpack_require__(669));
-const vm = __importStar(__webpack_require__(184));
 const add_comment_1 = __importDefault(__webpack_require__(627));
 const add_comment_for_label_1 = __importDefault(__webpack_require__(475));
 const add_contributors_1 = __importDefault(__webpack_require__(659));
@@ -20379,19 +20502,6 @@ exports.createTriggeredBy = (event, type) => (task) => {
     // TODO: branches and tags are not supported yet
     if (event === 'push' || event === 'pull_request') {
         return true;
-    }
-    return false;
-};
-exports.evaluateCondition = (condition, context) => {
-    core.info(`evaluating condition '${condition}' with context ${util.format(context)}`);
-    try {
-        vm.createContext(context);
-        const result = !!vm.runInContext(condition, context);
-        core.info(`condition '${condition}' ${result ? 'met' : 'unmet'}`);
-        return result;
-    }
-    catch (e) {
-        core.error(e);
     }
     return false;
 };
@@ -23363,52 +23473,7 @@ function index(value) {
 
 
 /***/ }),
-/* 592 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const remark_1 = __importDefault(__webpack_require__(781));
-exports.parseMarkdownIntoSections = (markdown) => {
-    const nodes = exports.parseMarkdown(markdown);
-    const sections = [];
-    for (const node of nodes) {
-        if (node.type === 'heading') {
-            sections.push({
-                title: node.children[0].value,
-                nodes: getSectionNodes(node, nodes),
-            });
-        }
-    }
-    return { sections };
-};
-exports.findSectionByLooseTitle = (sections, title) => {
-    return sections.find(section => section.title.toLowerCase().includes(title.toLowerCase()));
-};
-exports.parseMarkdown = (markdown) => {
-    const lexer = remark_1.default();
-    const nodes = lexer.parse(markdown).children;
-    return nodes;
-};
-const getSectionNodes = (header, nodes) => {
-    const section = [header];
-    const idx = nodes.indexOf(header);
-    for (let i = idx + 1; i < nodes.length; i++) {
-        const node = nodes[i];
-        if (node.type === 'heading') {
-            break;
-        }
-        section.push(node);
-    }
-    return section;
-};
-
-
-/***/ }),
+/* 592 */,
 /* 593 */,
 /* 594 */
 /***/ (function(module) {
@@ -24174,7 +24239,12 @@ module.exports = {
 
 
 /***/ }),
-/* 641 */,
+/* 641 */
+/***/ (function(module) {
+
+module.exports = require("vm");
+
+/***/ }),
 /* 642 */
 /***/ (function(module) {
 
@@ -24844,7 +24914,7 @@ const fs_extra_1 = __webpack_require__(226);
 const difference_1 = __importDefault(__webpack_require__(415));
 const template_1 = __importDefault(__webpack_require__(838));
 const contributors_1 = __webpack_require__(6);
-const markdown_1 = __webpack_require__(592);
+const markdown_1 = __webpack_require__(184);
 const str_1 = __webpack_require__(508);
 const run = async (client, { base = 'master', file = 'README.md', 'commit-message': commitMessage = 'add new contributor(s) to <%= file %>', 'exclude-patterns': excludePatterns = ['\\[bot\\]$'], }) => {
     if (github.context.ref !== `refs/heads/${base}`) {
@@ -35625,7 +35695,17 @@ module.exports = copyObject;
 
 /***/ }),
 /* 876 */,
-/* 877 */,
+/* 877 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var convert = __webpack_require__(675),
+    func = convert('partial', __webpack_require__(52));
+
+func.placeholder = __webpack_require__(602);
+module.exports = func;
+
+
+/***/ }),
 /* 878 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 

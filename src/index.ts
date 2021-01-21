@@ -1,9 +1,12 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import partial from 'lodash/fp/partial';
 
 import { getClient } from './client';
 import { getConfig } from './config';
-import { runTask, createTriggeredBy, evaluateCondition } from './tasks';
+import { runTask, createTriggeredBy } from './tasks';
+import { getTeamMembers } from './utils/github';
+import { evaluateCondition } from './vm';
 
 const run = async (): Promise<void> => {
   try {
@@ -29,7 +32,14 @@ const run = async (): Promise<void> => {
     }
 
     for (const task of tasks) {
-      if (!task.condition || evaluateCondition(task.condition, { payload, config: task.config })) {
+      if (
+        !task.condition ||
+        (await evaluateCondition(task.condition, {
+          payload,
+          config: task.config,
+          getTeamMembers: partial(getTeamMembers, client as any),
+        }))
+      ) {
         core.info(`running ${task.name} task for ${event} event`);
         await runTask(client, task);
       }
