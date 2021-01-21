@@ -19,8 +19,11 @@ const run = async (
 ): Promise<void> => {
   await client.projects.createCard({
     column_id: columnId,
-    content_type: 'Issue',
-    content_id: (github.context.payload.issue as any).id,
+    content_type:
+      github.context.eventName === 'pull_request' ? 'PullRequest' : 'Issue',
+    content_id:
+      github.context.payload.pull_request?.id ??
+      github.context.payload.issue?.id,
   });
 
   core.info(
