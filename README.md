@@ -65,8 +65,8 @@ The `tasks` key is an array of tasks, the event that triggers them, and their co
 - `remove-label`: Remove a label from an issue
   - `label` _(string)_: the label to remove
   - `exclude-labeler` _(boolean)_: if `true`, the label won't be removed if the event actor is the user that added the label
-- `assign-to-project`: Assign an issue to a project
-  - `column-id` _(number)_: the project column ID to put the issue in
+- `assign-to-project`: Assign an issue or pull request to a project
+  - `column-id` _(number)_: the project column ID to put the issue/PR in
 
 #### Condition Context
 
