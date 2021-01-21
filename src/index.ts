@@ -37,7 +37,8 @@ const run = async (): Promise<void> => {
         (await evaluateCondition(task.condition, {
           payload,
           config: task.config,
-          getTeamMembers: partial(getTeamMembers, client as any),
+          getTeamMembers: (teamSlug: string) =>
+            getTeamMembers(client, teamSlug),
         }))
       ) {
         core.info(`running ${task.name} task for ${event} event`);

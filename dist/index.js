@@ -1856,62 +1856,7 @@ module.exports = baseGetTag;
 
 
 /***/ }),
-/* 52 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var baseRest = __webpack_require__(272),
-    createWrap = __webpack_require__(227),
-    getHolder = __webpack_require__(683),
-    replaceHolders = __webpack_require__(944);
-
-/** Used to compose bitmasks for function metadata. */
-var WRAP_PARTIAL_FLAG = 32;
-
-/**
- * Creates a function that invokes `func` with `partials` prepended to the
- * arguments it receives. This method is like `_.bind` except it does **not**
- * alter the `this` binding.
- *
- * The `_.partial.placeholder` value, which defaults to `_` in monolithic
- * builds, may be used as a placeholder for partially applied arguments.
- *
- * **Note:** This method doesn't set the "length" property of partially
- * applied functions.
- *
- * @static
- * @memberOf _
- * @since 0.2.0
- * @category Function
- * @param {Function} func The function to partially apply arguments to.
- * @param {...*} [partials] The arguments to be partially applied.
- * @returns {Function} Returns the new partially applied function.
- * @example
- *
- * function greet(greeting, name) {
- *   return greeting + ' ' + name;
- * }
- *
- * var sayHelloTo = _.partial(greet, 'hello');
- * sayHelloTo('fred');
- * // => 'hello fred'
- *
- * // Partially applied with placeholders.
- * var greetFred = _.partial(greet, _, 'fred');
- * greetFred('hi');
- * // => 'hi fred'
- */
-var partial = baseRest(function(func, partials) {
-  var holders = replaceHolders(partials, getHolder(partial));
-  return createWrap(func, WRAP_PARTIAL_FLAG, undefined, partials, holders);
-});
-
-// Assign default placeholders.
-partial.placeholder = {};
-
-module.exports = partial;
-
-
-/***/ }),
+/* 52 */,
 /* 53 */,
 /* 54 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -15716,13 +15661,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
-const partial_1 = __importDefault(__webpack_require__(877));
 const client_1 = __webpack_require__(505);
 const config_1 = __webpack_require__(195);
 const tasks_1 = __webpack_require__(504);
@@ -15750,7 +15691,7 @@ const run = async () => {
                 (await vm_1.evaluateCondition(task.condition, {
                     payload,
                     config: task.config,
-                    getTeamMembers: partial_1.default(github_1.getTeamMembers, client),
+                    getTeamMembers: (teamSlug) => github_1.getTeamMembers(client, teamSlug),
                 }))) {
                 core.info(`running ${task.name} task for ${event} event`);
                 await tasks_1.runTask(client, task);
@@ -35695,17 +35636,7 @@ module.exports = copyObject;
 
 /***/ }),
 /* 876 */,
-/* 877 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-var convert = __webpack_require__(675),
-    func = convert('partial', __webpack_require__(52));
-
-func.placeholder = __webpack_require__(602);
-module.exports = func;
-
-
-/***/ }),
+/* 877 */,
 /* 878 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
