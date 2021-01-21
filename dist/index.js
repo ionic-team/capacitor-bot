@@ -14731,10 +14731,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const run = async (client, { 'column-id': columnId }) => {
+    var _a, _b, _c;
     await client.projects.createCard({
         column_id: columnId,
-        content_type: 'Issue',
-        content_id: github.context.payload.issue.id,
+        content_type: github.context.eventName === 'pull_request' ? 'PullRequest' : 'Issue',
+        content_id: (_b = (_a = github.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : (_c = github.context.payload.issue) === null || _c === void 0 ? void 0 : _c.id,
     });
     core.info(`added issue #${github.context.issue.number} to project column ${columnId}`);
 };
