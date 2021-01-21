@@ -1,6 +1,5 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import partial from 'lodash/fp/partial';
 
 import { getClient } from './client';
 import { getConfig } from './config';
