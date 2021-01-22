@@ -4,8 +4,14 @@ import * as github from '@actions/github';
 import type { GitHubClient } from '../client';
 import type { Task } from '../config';
 
+export interface AssignToProjectColumns {
+  readonly issue?: number;
+  readonly pr?: number;
+  readonly 'draft-pr'?: number;
+}
+
 export interface AssignToProjectConfig {
-  readonly 'column-id': number;
+  readonly columns?: AssignToProjectColumns;
 }
 
 export type AssignToProjectTask = Task<
@@ -15,8 +21,14 @@ export type AssignToProjectTask = Task<
 
 const run = async (
   client: GitHubClient,
-  { 'column-id': columnId }: AssignToProjectConfig,
+  { columns }: AssignToProjectConfig,
 ): Promise<void> => {
+  const columnId = getColumnId(columns);
+
+  if (!columnId) {
+    throw new Error('No column ID configured.');
+  }
+
   await client.projects.createCard({
     column_id: columnId,
     content_type:
@@ -29,6 +41,22 @@ const run = async (
   core.info(
     `added issue #${github.context.issue.number} to project column ${columnId}`,
   );
+};
+
+const getColumnId = ({
+  issue,
+  pr,
+  'draft-pr': draftPR,
+}: AssignToProjectColumns = {}): number | undefined => {
+  if (github.context.eventName === 'pull_request') {
+    if (github.context.payload.pull_request?.draft) {
+      return draftPR;
+    } else {
+      return pr;
+    }
+  }
+
+  return issue;
 };
 
 export default run;
