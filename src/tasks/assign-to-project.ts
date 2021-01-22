@@ -38,6 +38,10 @@ const run = async (
         github.context.payload.pull_request?.id ??
         github.context.payload.issue?.id,
     });
+
+    core.info(
+      `added issue #${github.context.issue.number} to project column ${columnId}`,
+    );
   } catch (e) {
     if (e.status === 422) {
       core.warning(
@@ -47,10 +51,6 @@ const run = async (
       throw e;
     }
   }
-
-  core.info(
-    `added issue #${github.context.issue.number} to project column ${columnId}`,
-  );
 };
 
 const getColumnId = ({
