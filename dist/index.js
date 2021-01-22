@@ -14744,8 +14744,12 @@ const run = async (client, { columns }) => {
         });
     }
     catch (e) {
-        console.log(e);
-        throw e;
+        if (e.status === 422) {
+            core.warning(`issue #${github.context.issue.number} is already in project`);
+        }
+        else {
+            throw e;
+        }
     }
     core.info(`added issue #${github.context.issue.number} to project column ${columnId}`);
 };
