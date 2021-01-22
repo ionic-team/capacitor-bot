@@ -14736,11 +14736,17 @@ const run = async (client, { columns }) => {
     if (!columnId) {
         throw new Error('No column ID configured.');
     }
-    await client.projects.createCard({
-        column_id: columnId,
-        content_type: github.context.eventName === 'pull_request' ? 'PullRequest' : 'Issue',
-        content_id: (_b = (_a = github.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : (_c = github.context.payload.issue) === null || _c === void 0 ? void 0 : _c.id,
-    });
+    try {
+        await client.projects.createCard({
+            column_id: columnId,
+            content_type: github.context.eventName === 'pull_request' ? 'PullRequest' : 'Issue',
+            content_id: (_b = (_a = github.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : (_c = github.context.payload.issue) === null || _c === void 0 ? void 0 : _c.id,
+        });
+    }
+    catch (e) {
+        console.log(e);
+        throw e;
+    }
     core.info(`added issue #${github.context.issue.number} to project column ${columnId}`);
 };
 const getColumnId = ({ issue, pr, 'draft-pr': draftPR, } = {}) => {
