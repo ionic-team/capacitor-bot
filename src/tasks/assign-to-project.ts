@@ -39,8 +39,13 @@ const run = async (
         github.context.payload.issue?.id,
     });
   } catch (e) {
-    console.log(e);
-    throw e;
+    if (e.status === 422) {
+      core.warning(
+        `issue #${github.context.issue.number} is already in project`,
+      );
+    } else {
+      throw e;
+    }
   }
 
   core.info(
