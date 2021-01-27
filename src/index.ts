@@ -12,11 +12,16 @@ const run = async (): Promise<void> => {
     const { eventName, payload } = github.context;
     const { action } = payload;
 
-    const repoToken = core.getInput('repo-token', { required: true });
-    const configPath = core.getInput('config-path', { required: true });
-
     const event = `${eventName}${action ? ` (type: ${action})` : ''}`;
     core.info(`triggered by: ${event}`);
+
+    const repoToken = core.getInput('repo-token');
+    const configPath = core.getInput('config-path', { required: true });
+
+    if (!repoToken) {
+      core.warning(`no repo-token input provided--skipping tasks`);
+      return;
+    }
 
     const client = getClient(repoToken);
     const config = await getConfig(client, configPath);

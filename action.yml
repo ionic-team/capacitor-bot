@@ -3,7 +3,6 @@ description: The bot for Ionic and Capacitor repos.
 inputs:
   repo-token:
     description: Personal Access Token for GitHub Repository
-    required: true
   config-path:
     description: Path to config file
     default: .github/bot.yml
